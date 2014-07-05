@@ -12,13 +12,25 @@ import sys
 import time
 # import os
 
+
 class Document(object):
     dna = ""
     id = 0
-    left = False # If document comes from the left or right part of a read
+    left = False  # If document comes from the left or right part of a read
+
+    # Initializer
+    def __init__(self, dna, id, left):
+        self.dna = dna
+        self.id = id
+        self.left = left
 
 
-def option_parse():
+def createDocument(dna, id, left):
+    document = Document(dna, id, left)
+    return document
+
+
+def optionParse():
     """
     Parse arguments from command line.
     """
@@ -104,6 +116,17 @@ def readData(fasta_file):
         print("ERROR: NO FASTA FILE GIVEN")
 
 
+def createDocuments(reads):
+    id = 1
+    documents = []
+    for read in reads:
+        leftpart, rightpart = read[:len(read)/2], read[len(read)/2:]
+        documents.append(createDocument(leftpart, id, True))
+        documents.append(createDocument(rightpart, id, False))
+        id += 1
+    return documents
+
+
 def main():
     """
     Main method of the program
@@ -111,11 +134,14 @@ def main():
     totim = time.clock()
 
     # Parse command line options #
-    fasta_file, k, n, threshold, bands, rows = option_parse()
+    fasta_file, k, n, threshold, bands, rows = optionParse()
 
     # Read all reads from fasta file #
     reads = readData(fasta_file)
-    print reads
+
+    documents = createDocuments(reads)
+    for doc in documents:
+        print doc.dna, doc.id, doc.left
 
     print "Total time used:", time.clock() - totim
 
