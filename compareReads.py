@@ -8,6 +8,7 @@ __date__ = "03/07/2014"
 __version__ = "$Revision: 1.0"
 
 from optparse import OptionParser
+# import itertools
 import sys
 import time
 # import os
@@ -16,17 +17,17 @@ import time
 class Document(object):
     dna = ""
     id = 0
-    left = False  # If document comes from the left or right part of a read
+    isLeft = False  # If document comes from the left or right part of a read
 
     # Initializer
-    def __init__(self, dna, id, left):
+    def __init__(self, dna, id, isLeft):
         self.dna = dna
         self.id = id
-        self.left = left
+        self.isLeft = isLeft
 
 
-def createDocument(dna, id, left):
-    document = Document(dna, id, left)
+def createDocument(dna, id, isLeft):
+    document = Document(dna, id, isLeft)
     return document
 
 
@@ -118,13 +119,24 @@ def readData(fasta_file):
 
 def createDocuments(reads):
     id = 1
-    documents = []
+    leftDocs = []
+    rightDocs = []
     for read in reads:
         leftpart, rightpart = read[:len(read)/2], read[len(read)/2:]
-        documents.append(createDocument(leftpart, id, True))
-        documents.append(createDocument(rightpart, id, False))
+        leftDocs.append(createDocument(leftpart, id, True))
+        rightDocs.append(createDocument(rightpart, id, False))
         id += 1
-    return documents
+    return leftDocs, rightDocs
+
+
+def shingling(docset, k):
+    shingles = set()
+    for doc in docset:
+        for i in range(len(doc.dna)-k):
+            shingle = doc.dna[i:i+k]
+            if shingle not in shingles:
+                shingles.add(shingle)
+    return sorted(shingles)
 
 
 def main():
@@ -139,9 +151,21 @@ def main():
     # Read all reads from fasta file #
     reads = readData(fasta_file)
 
-    documents = createDocuments(reads)
-    for doc in documents:
-        print doc.dna, doc.id, doc.left
+    leftDocs, rightDocs = createDocuments(reads)
+    # for left,right in itertools.izip(leftDocs, rightDocs):
+    #     print left.dna, left.id, left.isLeft
+    #     print right.dna, right.id, right.isLeft
+
+    leftShingles = shingling(leftDocs, k)
+    rightShingles = shingling(rightDocs, k)
+    
+    print leftShingles
+    print len(leftShingles)
+    # print rightShingles
+    print len(rightShingles)
+
+    print set(leftShingles) - set(rightShingles)
+    print set(rightShingles) - set(leftShingles)
 
     print "Total time used:", time.clock() - totim
 
