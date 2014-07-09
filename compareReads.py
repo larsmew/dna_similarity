@@ -11,6 +11,7 @@ from optparse import OptionParser
 # import itertools
 import sys
 import time
+import random
 # import os
 
 
@@ -18,6 +19,9 @@ class Document(object):
     dna = ""
     id = 0
     isLeft = False  # If document comes from the left or right part of a read
+    shingles = set()
+    vector = []
+    signature = []
 
     # Initializer
     def __init__(self, dna, id, isLeft):
@@ -119,24 +123,59 @@ def readData(fasta_file):
 
 def createDocuments(reads):
     id = 1
-    leftDocs = []
-    rightDocs = []
+    documents = []
     for read in reads:
         leftpart, rightpart = read[:len(read)/2], read[len(read)/2:]
-        leftDocs.append(createDocument(leftpart, id, True))
-        rightDocs.append(createDocument(rightpart, id, False))
+        documents.append(createDocument(leftpart, id, True))
+        documents.append(createDocument(rightpart, id, False))
         id += 1
-    return leftDocs, rightDocs
+    return documents
 
 
 def shingling(docset, k):
     shingles = set()
     for doc in docset:
+        docShingles = set()
         for i in range(len(doc.dna)-k):
             shingle = doc.dna[i:i+k]
             if shingle not in shingles:
                 shingles.add(shingle)
+            if shingle not in docShingles:
+                docShingles.add(shingle)
+        doc.shingles = docShingles
     return sorted(shingles)
+
+
+def generateVectors(docset, shingles):
+    for doc in docset:
+        vector = []
+        for shingle in shingles:
+            if shingle in doc.shingles:
+                vector.append(1)
+            else:
+                vector.append(0)
+        doc.vector = vector
+        print vector
+
+
+def minhashing(docset, shingles, n):
+    hashfuncs = []
+    for i in range(n):
+        h = range(len(shingles))
+        random.shuffle(h)
+        hashfuncs.append(h)
+        print h,"\n"
+    for doc in docset:
+        #print docset[0].shingles
+        signature = [None for i in range(n)]
+        #print signature
+        #print len(signature)
+        for r in range(len(shingles)):
+            if shingles[r] in doc.shingles:
+                for i in range(len(hashfuncs)):
+                    if signature[i] == None or signature[i] > hashfuncs[i][r]:
+                        signature[i] = hashfuncs[i][r]
+        #print signature
 
 
 def main():
@@ -151,21 +190,17 @@ def main():
     # Read all reads from fasta file #
     reads = readData(fasta_file)
 
-    leftDocs, rightDocs = createDocuments(reads)
+    documents = createDocuments(reads)
     # for left,right in itertools.izip(leftDocs, rightDocs):
     #     print left.dna, left.id, left.isLeft
     #     print right.dna, right.id, right.isLeft
 
-    leftShingles = shingling(leftDocs, k)
-    rightShingles = shingling(rightDocs, k)
+    shingles = shingling(documents, k)
     
-    print leftShingles
-    print len(leftShingles)
-    # print rightShingles
-    print len(rightShingles)
+    print shingles
+    print len(shingles)
 
-    print set(leftShingles) - set(rightShingles)
-    print set(rightShingles) - set(leftShingles)
+    minhashing(documents, shingles, n)
 
     print "Total time used:", time.clock() - totim
 
