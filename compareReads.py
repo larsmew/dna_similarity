@@ -20,7 +20,6 @@ class Document(object):
     id = 0
     isLeft = False  # If document comes from the left or right part of a read
     shingles = set()
-    vector = []
     signature = []
 
     # Initializer
@@ -146,38 +145,6 @@ def shingling(docset, k):
     return sorted(shingles)
 
 
-def generateVectors(docset, shingles):
-    for doc in docset:
-        vector = []
-        for shingle in shingles:
-            if shingle in doc.shingles:
-                vector.append(1)
-            else:
-                vector.append(0)
-        doc.vector = vector
-        print vector
-
-
-def minhashing(docset, shingles, n):
-    hashfuncs = []
-    for i in range(n):
-        h = range(len(shingles))
-        random.shuffle(h)
-        hashfuncs.append(h)
-        print h,"\n"
-    for doc in docset:
-        #print docset[0].shingles
-        signature = [None for i in range(n)]
-        #print signature
-        #print len(signature)
-        for r in range(len(shingles)):
-            if shingles[r] in doc.shingles:
-                for i in range(len(hashfuncs)):
-                    if signature[i] == None or signature[i] > hashfuncs[i][r]:
-                        signature[i] = hashfuncs[i][r]
-        #print signature
-
-
 def main():
     """
     Main method of the program
@@ -200,7 +167,7 @@ def main():
     print shingles
     print len(shingles)
 
-    minhashing(documents, shingles, n)
+    #minhashing(documents, shingles, n)
 
     print "Total time used:", time.clock() - totim
 
