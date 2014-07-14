@@ -17,6 +17,10 @@ import random
 
 
 class Document(object):
+    """
+    Defines the data structure of a document. Like dna sequence, id, left or
+    right part of string, shingles related to the string, the minhash signature
+    """
     dna = ""
     id = 0
     isLeft = False  # If document comes from the left or right part of a read
@@ -32,6 +36,9 @@ class Document(object):
 
 
 def createDocument(dna, id, isLeft):
+    """
+    Function to create document objects
+    """
     document = Document(dna, id, isLeft)
     return document
 
@@ -100,6 +107,9 @@ def optionParse():
 
 
 def readData(fasta_file):
+    """
+    Extract the reads (DNA sequences) from the given fasta file
+    """
     if fasta_file:
         reads = []
         with open(fasta_file, "rU") as fasta_file:
@@ -123,30 +133,48 @@ def readData(fasta_file):
 
 
 def createDocuments(reads):
-    id = 1
+    """
+    Splits each read into two parts - left and right halfs - and creates
+    the document objects.
+    """
+    id = 1  # Uses international id system for bookkeeping
     documents = []
     for read in reads:
+        # Splits the string into two parts
         leftpart, rightpart = read[:len(read)/2], read[len(read)/2:]
+        # Creates a document object for the left part of the read
         documents.append(createDocument(leftpart, id, True))
+        # Creates a document object for the right part of the read
         documents.append(createDocument(rightpart, id, False))
         id += 1
     return documents
 
 
 def shingling(docs, k):
-    shingles = set()
+    """
+    Create k-shingles (substrings of length k) from each document
+    """
+    shingles = set()  # Contains all k-shingles in the dataset
     for doc in docs:
-        docShingles = set()
+        docShingles = set()  # Contains the k-shingles in the given document
         for i in range(len(doc.dna)-k):
+            # create k-shingle (substring) from the document
             shingle = doc.dna[i:i+k]
+            # Add it to the set of all shingles
             shingles.add(shingle)
+            # Add it to the set of shingles of the current document
             docShingles.add(shingle)
+        # Store the document's shingles in the document object
         doc.shingles = docShingles
         # print docShingles,"\n"
     return shingles
 
 
 def minhashing(docs, shingles, n):
+    """
+    Create minhash signatures using the shingles
+    """
+    # Create n different permutations (hash functions) of the shingles
     hashfuncs = []
     for i in range(n):
         h = range(len(shingles))
@@ -154,10 +182,16 @@ def minhashing(docs, shingles, n):
         hashfuncs.append(h)
         # print h,"\n"
 
+    # Create minhash signatures as described in chapter 3 of the book Massive
+    # Data Mining
+    # Find signature for each document
     for doc in docs:
         signature = [None for i in range(n)]
+        # For each row in the 'character matrix'
         for r in range(len(shingles)):
+            # If the shingle is in the document, then
             if shingles[r] in doc.shingles:
+                # Find the 'first' shingle relative to each permutation
                 for i in range(len(hashfuncs)):
                     if signature[i] is None or signature[i] > hashfuncs[i][r]:
                         signature[i] = hashfuncs[i][r]
@@ -167,6 +201,7 @@ def minhashing(docs, shingles, n):
 
 def LSH(documents, bands, rows):
     band_buckets = []
+    # buckets = dict([])
     index = 0
     counter = 0
     for b in range(bands):
@@ -226,31 +261,25 @@ def findSimilarPairs(band_buckets, t):
     print "{:,}".format(counter2)
 
 
-def testCounter(t):
-    listA = [1,0,1,2,3]
-    listB = [1,0,1,2,2]
-    counterA = Counter(listA)
-    counterB = Counter(listB)
-    print counterA, counterB
-    print counterA - counterB
-    print sum(counterA - counterB)
-    print sum((counterA - counterB).values())
-    print counterA & counterB
-    print sum(counterA & counterB)
-    print sum((counterA & counterB).values())
-    print counterA | counterB
-    print sum(counterA | counterB)
-    print sum((counterA | counterB).values())
+def bucketSize(band_buckets):
+    count = 0
+    for buckets in band_buckets:
+        for bucket in buckets:
+            print len(buckets[bucket]),
+            count += len(buckets[bucket])*(len(buckets[bucket])-1)/2
+        print
+        print count
+        print
+        # 712967 + 701401 + 690372 + 761370 + 686222 = 3552332
+        # 3552332
+        # 3916013
+        # 3621369
+        # 3804308
 
-    intersection = sum((counterA & counterB).values())
-    union = sum((counterA | counterB).values())
-    print t
-    if float(intersection) / union > t:
-        print float(intersection) / union
-        print t
-    if float(intersection) / union >= t:
-        print "lol"
-    
+        # 3702466
+        # 3742476
+        # 3640087
+        # 3768266
 
 
 def main():
@@ -280,9 +309,8 @@ def main():
 
     print "Time used:", time.clock() - totim
 
-    findSimilarPairs(band_buckets, threshold)
-
-    testCounter(threshold)
+    #findSimilarPairs(band_buckets, threshold)
+    bucketSize(band_buckets)
 
     print "Total time used (in secs):", time.clock() - totim
 
