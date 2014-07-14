@@ -8,6 +8,7 @@ __date__ = "03/07/2014"
 __version__ = "$Revision: 1.0"
 
 from optparse import OptionParser
+from collections import Counter
 # import itertools
 import sys
 import time
@@ -21,6 +22,7 @@ class Document(object):
     isLeft = False  # If document comes from the left or right part of a read
     shingles = set()
     signature = []
+    similarTo = set()
 
     # Initializer
     def __init__(self, dna, id, isLeft):
@@ -54,7 +56,7 @@ def optionParse():
     parser.add_option("-k", "--k_size",
                       metavar="<VALUE>",
                       type=int,
-                      default=5,
+                      default=12,
                       action="store",
                       dest="k",
                       help="set <VALUE> as size for k-shingles.")
@@ -70,7 +72,7 @@ def optionParse():
     parser.add_option("-t", "--threshold",
                       metavar="<VALUE>",
                       type=float,
-                      default=1/2,
+                      default=float(2)/3,
                       action="store",
                       dest="threshold",
                       help="set <VALUE> as threshold similarity.")
@@ -131,18 +133,124 @@ def createDocuments(reads):
     return documents
 
 
-def shingling(docset, k):
+def shingling(docs, k):
     shingles = set()
-    for doc in docset:
+    for doc in docs:
         docShingles = set()
         for i in range(len(doc.dna)-k):
             shingle = doc.dna[i:i+k]
-            if shingle not in shingles:
-                shingles.add(shingle)
-            if shingle not in docShingles:
-                docShingles.add(shingle)
+            shingles.add(shingle)
+            docShingles.add(shingle)
         doc.shingles = docShingles
-    return sorted(shingles)
+        # print docShingles,"\n"
+    return shingles
+
+
+def minhashing(docs, shingles, n):
+    hashfuncs = []
+    for i in range(n):
+        h = range(len(shingles))
+        random.shuffle(h)
+        hashfuncs.append(h)
+        # print h,"\n"
+
+    for doc in docs:
+        signature = [None for i in range(n)]
+        for r in range(len(shingles)):
+            if shingles[r] in doc.shingles:
+                for i in range(len(hashfuncs)):
+                    if signature[i] is None or signature[i] > hashfuncs[i][r]:
+                        signature[i] = hashfuncs[i][r]
+        doc.signature = signature
+        # print signature
+
+
+def LSH(documents, bands, rows):
+    band_buckets = []
+    index = 0
+    counter = 0
+    for b in range(bands):
+        buckets = dict([])
+        for i in range(len(documents)):
+            col = documents[i].signature[index:index+rows]
+            key = ''.join(map(str, col))
+            if key in buckets:
+                buckets[key].append(documents[i])
+            else:
+                buckets[key] = [documents[i]]
+            counter += 1
+        print counter
+        index += rows
+        band_buckets.append(buckets)
+
+    # for bucket in buckets:
+    #     print "Bucket:", bucket
+    #     for document in buckets[bucket]:
+    #         print document.id,
+    #     print
+
+    return band_buckets
+
+
+def findSimilarPairs(band_buckets, t):
+    counter = 0
+    counter2 = 0
+    for buckets in band_buckets:
+        for bucket in buckets:
+            if len(buckets[bucket]) > 1:
+                for i in range(len(buckets[bucket])):
+                    for j in range(i+1, len(buckets[bucket])):
+                        doc1, doc2 = buckets[bucket][i], buckets[bucket][j]
+                        counter += 1
+                        if doc1.id != doc2.id and doc1.isLeft != doc2.isLeft:
+                            counterA = Counter(doc1.signature)
+                            counterB = Counter(doc2.signature)
+                            intersection = sum((counterA & counterB).values())
+                            union = sum((counterA | counterB).values())
+                            if counter2 == 0:
+                                print counterA
+                                print counterB
+                                print intersection
+                                print union
+                                print float(intersection) / union
+                            if float(intersection) / union >= t:
+                                # print doc1.id, doc2.id
+                                # print doc1.isLeft, doc2.isLeft
+                                # print intersection, union
+                                # print float(intersection) / union
+                                # print
+                                counter2 += 1
+                                doc1.similarTo.add(doc2)
+                                doc2.similarTo.add(doc1)
+    print "{:,}".format(counter)
+    print "{:,}".format(counter2)
+
+
+def testCounter(t):
+    listA = [1,0,1,2,3]
+    listB = [1,0,1,2,2]
+    counterA = Counter(listA)
+    counterB = Counter(listB)
+    print counterA, counterB
+    print counterA - counterB
+    print sum(counterA - counterB)
+    print sum((counterA - counterB).values())
+    print counterA & counterB
+    print sum(counterA & counterB)
+    print sum((counterA & counterB).values())
+    print counterA | counterB
+    print sum(counterA | counterB)
+    print sum((counterA | counterB).values())
+
+    intersection = sum((counterA & counterB).values())
+    union = sum((counterA | counterB).values())
+    print t
+    if float(intersection) / union > t:
+        print float(intersection) / union
+        print t
+    if float(intersection) / union >= t:
+        print "lol"
+    
 
 
 def main():
@@ -158,18 +266,25 @@ def main():
     reads = readData(fasta_file)
 
     documents = createDocuments(reads)
-    # for left,right in itertools.izip(leftDocs, rightDocs):
-    #     print left.dna, left.id, left.isLeft
-    #     print right.dna, right.id, right.isLeft
+    # for doc in documents:
+    #     print doc.dna, doc.id, doc.isLeft
 
-    shingles = shingling(documents, k)
-    
-    print shingles
-    print len(shingles)
+    shingles = list(shingling(documents, k))
 
-    #minhashing(documents, shingles, n)
+    # print shingles
+    # print len(shingles)
 
-    print "Total time used:", time.clock() - totim
+    minhashing(documents, shingles, n)
+
+    band_buckets = LSH(documents, bands, rows)
+
+    print "Time used:", time.clock() - totim
+
+    findSimilarPairs(band_buckets, threshold)
+
+    testCounter(threshold)
+
+    print "Total time used (in secs):", time.clock() - totim
 
 
 if __name__ == '__main__':
