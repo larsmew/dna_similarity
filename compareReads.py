@@ -228,6 +228,9 @@ def LSH(documents, bands, rows):
 
 
 def findSimilarPairs(band_buckets, t):
+    """
+    Find candidate pairs that has a similarity above the threshold t
+    """
     counter = 0
     counter2 = 0
     for buckets in band_buckets:
@@ -237,23 +240,24 @@ def findSimilarPairs(band_buckets, t):
                     for j in range(i+1, len(buckets[bucket])):
                         doc1, doc2 = buckets[bucket][i], buckets[bucket][j]
                         counter += 1
-                        if doc1.id != doc2.id and doc1.isLeft != doc2.isLeft:
+                        # Check if doc1 and doc2 are candidate pairs
+                        if doc1.isLeft != doc2.isLeft and doc1.id != doc2.id:
+                            # Count similar elements in signature
                             counterA = Counter(doc1.signature)
                             counterB = Counter(doc2.signature)
+                            # Find intersection of elements in doc1 and doc2
                             intersection = sum((counterA & counterB).values())
+                            # Find union of elements in doc1 and doc2
                             union = sum((counterA | counterB).values())
+                            # For testing
                             if counter2 == 0:
                                 print counterA
                                 print counterB
                                 print intersection
                                 print union
                                 print float(intersection) / union
+                            # Check if jaccard similarity is above t
                             if float(intersection) / union >= t:
-                                # print doc1.id, doc2.id
-                                # print doc1.isLeft, doc2.isLeft
-                                # print intersection, union
-                                # print float(intersection) / union
-                                # print
                                 counter2 += 1
                                 doc1.similarTo.add(doc2)
                                 doc2.similarTo.add(doc1)
@@ -261,6 +265,7 @@ def findSimilarPairs(band_buckets, t):
     print "{:,}".format(counter2)
 
 
+### NOT relevant method, just for playing around ###
 def bucketSize(band_buckets):
     count = 0
     for buckets in band_buckets:
