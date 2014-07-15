@@ -291,6 +291,9 @@ def main():
     # Parse command line options #
     fasta_file, k, n, threshold, bands, rows = optionParse()
 
+    if bands*rows != n:
+        print "ERROR: bands * rows not equal to n (number of hash functions)"
+
     # Read all reads from fasta file #
     reads = readData(fasta_file)
 
@@ -309,8 +312,8 @@ def main():
 
     print "Time used:", time.clock() - totim
 
-    #findSimilarPairs(band_buckets, threshold)
-    bucketSize(band_buckets)
+    findSimilarPairs(band_buckets, threshold)
+    # bucketSize(band_buckets)
 
     print "Total time used (in secs):", time.clock() - totim
 
