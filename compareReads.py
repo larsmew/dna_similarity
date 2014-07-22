@@ -9,11 +9,12 @@ __version__ = "$Revision: 1.0"
 
 from optparse import OptionParser
 from collections import Counter
-# import itertools
+import itertools
 import sys
 import time
 import random
 # import os
+import math
 
 
 class Document(object):
@@ -200,19 +201,27 @@ def minhashing(docs, shingles, n):
 
 
 def LSH(documents, bands, rows):
+    """
+    Use Locality-Sensitive Hashing (LSH) with the banding technique to
+    hash similar elements to the same buckets.
+    """
     band_buckets = []
     # buckets = dict([])
     index = 0
     counter = 0
     for b in range(bands):
+        # For each band, create a bucket array with signature as key
         buckets = dict([])
-        for i in range(len(documents)):
-            col = documents[i].signature[index:index+rows]
+        for doc in documents:
+            # Obtain sub-signature of length rows
+            col = doc.signature[index:index+rows]
+            # Convert to string
             key = ''.join(map(str, col))
+            # Place the document in a bucket
             if key in buckets:
-                buckets[key].append(documents[i])
+                buckets[key].append(doc)
             else:
-                buckets[key] = [documents[i]]
+                buckets[key] = [doc]
             counter += 1
         print counter
         index += rows
@@ -242,30 +251,99 @@ def findSimilarPairs(band_buckets, t):
                         counter += 1
                         # Check if doc1 and doc2 are candidate pairs
                         if doc1.isLeft != doc2.isLeft and doc1.id != doc2.id:
-                            # Count similar elements in signature
-                            counterA = Counter(doc1.signature)
-                            counterB = Counter(doc2.signature)
-                            # Find intersection of elements in doc1 and doc2
-                            intersection = sum((counterA & counterB).values())
-                            # Find union of elements in doc1 and doc2
-                            union = sum((counterA | counterB).values())
-                            # For testing
-                            if counter2 == 0:
-                                print counterA
-                                print counterB
-                                print intersection
-                                print union
-                                print float(intersection) / union
-                            # Check if jaccard similarity is above t
-                            if float(intersection) / union >= t:
-                                counter2 += 1
-                                doc1.similarTo.add(doc2)
-                                doc2.similarTo.add(doc1)
+                            #counter2 = jaccardSim(doc1, doc2, t, counter2)
+                            #counter2 = euclideanDistance(doc1, doc2, counter2)
+                            #counter2 = testLCS(doc1, doc2, counter2)
+                            print doc1.dna, doc1.id
+                            print doc2.dna, doc2.id
+                            print doc1.signature
+                            print doc2.signature
+                            print
     print "{:,}".format(counter)
     print "{:,}".format(counter2)
 
 
-### NOT relevant method, just for playing around ###
+def jaccardSim(doc1, doc2, t, counter2):
+    # Count similar elements in signature
+    counterA = Counter(doc1.signature)
+    counterB = Counter(doc2.signature)
+    # Find intersection of elements in doc1 and doc2
+    intersection = sum((counterA & counterB).values())
+    # Find union of elements in doc1 and doc2
+    union = len(doc1.signature) + len(doc2.signature) - intersection
+
+    # For testing
+    if counter2 < 100:
+        print doc1.id, doc2.id
+        print counterA
+        print counterB
+        print intersection
+        print union
+        print float(intersection) / union
+    else:
+        sys.exit(0)
+
+    # Check if jaccard similarity is above t
+    if float(intersection) / union >= t:
+        counter2 += 1
+        doc1.similarTo.add(doc2)
+        doc2.similarTo.add(doc1)
+    return counter2
+
+
+def euclideanDistance(doc1, doc2, counter2):
+    sig1, sig2 = doc1.signature, doc2.signature
+    counter2 += 1
+    lol = sum([(x-y)**2 for x, y in
+              itertools.izip(sig1, sig2)])
+    if counter2 < 100:
+        print doc1.id, doc2.id
+        print sig1
+        print sig2
+        print lol
+        print math.sqrt(lol)
+    else:
+        sys.exit(0)
+
+    # intersum = 0
+    # for x, y in itertools.izip(sig1, sig2):
+    #     intersum
+    return counter2
+
+
+def longest_common_substring(s1, s2):
+    m = [[0] * (1 + len(s2)) for i in xrange(1 + len(s1))]
+    longest, x_longest = 0, 0
+    for x in xrange(1, 1 + len(s1)):
+        for y in xrange(1, 1 + len(s2)):
+            if s1[x - 1] == s2[y - 1]:
+                m[x][y] = m[x - 1][y - 1] + 1
+                if m[x][y] > longest:
+                    longest = m[x][y]
+                    x_longest = x
+            else:
+                m[x][y] = 0
+    return s1[x_longest - longest: x_longest]
+
+# test_longest_common_substring
+def testLCS(doc1, doc2, counter2):
+    sig1 = ''.join(map(str, doc1.signature))
+    sig2 = ''.join(map(str, doc2.signature))
+    seq = longest_common_substring(sig1, sig2)
+    counter2 += 1
+    #print (doc1.id, doc2.id),
+    if counter2 < 100:
+        print doc1.id, doc2.id
+        print sig1
+        print sig2
+        print seq
+        print
+    else:
+        sys.exit(0)
+    return counter2
+
+
+# NOT relevant method, just for playing around #
 def bucketSize(band_buckets):
     count = 0
     for buckets in band_buckets:
@@ -297,7 +375,8 @@ def main():
     fasta_file, k, n, threshold, bands, rows = optionParse()
 
     if bands*rows != n:
-        print "ERROR: bands * rows not equal to n (number of hash functions)"
+        print "ERROR: bands * rows do not equal n (number of hash functions)"
+        sys.exit(0)
 
     # Read all reads from fasta file #
     reads = readData(fasta_file)
@@ -318,6 +397,7 @@ def main():
     print "Time used:", time.clock() - totim
 
     findSimilarPairs(band_buckets, threshold)
+
     # bucketSize(band_buckets)
 
     print "Total time used (in secs):", time.clock() - totim
