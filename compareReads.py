@@ -14,7 +14,9 @@ import sys
 import time
 import random
 # import os
-import math
+# import math
+# import numpy
+# import nwalign as nw
 
 
 class Document(object):
@@ -158,7 +160,7 @@ def shingling(docs, k):
     shingles = set()  # Contains all k-shingles in the dataset
     for doc in docs:
         docShingles = set()  # Contains the k-shingles in the given document
-        for i in range(len(doc.dna)-k):
+        for i in xrange(len(doc.dna)-k):
             # create k-shingle (substring) from the document
             shingle = doc.dna[i:i+k]
             # Add it to the set of all shingles
@@ -177,7 +179,7 @@ def minhashing(docs, shingles, n):
     """
     # Create n different permutations (hash functions) of the shingles
     hashfuncs = []
-    for i in range(n):
+    for i in xrange(n):
         h = range(len(shingles))
         random.shuffle(h)
         hashfuncs.append(h)
@@ -187,13 +189,13 @@ def minhashing(docs, shingles, n):
     # Data Mining
     # Find signature for each document
     for doc in docs:
-        signature = [None for i in range(n)]
+        signature = [None for i in xrange(n)]
         # For each row in the 'character matrix'
-        for r in range(len(shingles)):
+        for r in xrange(len(shingles)):
             # If the shingle is in the document, then
             if shingles[r] in doc.shingles:
                 # Find the 'first' shingle relative to each permutation
-                for i in range(len(hashfuncs)):
+                for i in xrange(n):
                     if signature[i] is None or signature[i] > hashfuncs[i][r]:
                         signature[i] = hashfuncs[i][r]
         doc.signature = signature
@@ -209,7 +211,7 @@ def LSH(documents, bands, rows):
     # buckets = dict([])
     index = 0
     counter = 0
-    for b in range(bands):
+    for b in xrange(bands):
         # For each band, create a bucket array with signature as key
         buckets = dict([])
         for doc in documents:
@@ -236,34 +238,45 @@ def LSH(documents, bands, rows):
     return band_buckets
 
 
-def findSimilarPairs(band_buckets, t):
+def findSimilarPairs(band_buckets, t, totim):
     """
     Find candidate pairs that has a similarity above the threshold t
     """
     counter = 0
     counter2 = 0
+    timer = time.clock()
     for buckets in band_buckets:
         for bucket in buckets:
             if len(buckets[bucket]) > 1:
-                for i in range(len(buckets[bucket])):
-                    for j in range(i+1, len(buckets[bucket])):
+                for i in xrange(len(buckets[bucket])):
+                    for j in xrange(i+1, len(buckets[bucket])):
                         doc1, doc2 = buckets[bucket][i], buckets[bucket][j]
                         counter += 1
                         # Check if doc1 and doc2 are candidate pairs
                         if doc1.isLeft != doc2.isLeft and doc1.id != doc2.id:
-                            #counter2 = jaccardSim(doc1, doc2, t, counter2)
-                            #counter2 = euclideanDistance(doc1, doc2, counter2)
-                            #counter2 = testLCS(doc1, doc2, counter2)
-                            print doc1.dna, doc1.id
-                            print doc2.dna, doc2.id
-                            print doc1.signature
-                            print doc2.signature
-                            print
+                            counter2 += 1
+                            # jaccardSim(doc1, doc2, t)
+                            # euclideanDistance(doc1, doc2)
+                            # testLCS(doc1, doc2)
+                            if counter2 < 10000000:
+                                globalAlignment(doc1, doc2)
+                                if counter2 % 100000 == 0:
+                                    print "Processed", counter2, "pairs in", \
+                                        "time:", time.clock() - timer
+                            else:
+                                print "Total time used (in secs):", \
+                                    time.clock() - totim
+                                sys.exit()
+                            # print doc1.dna, doc1.id
+                            # print doc2.dna, doc2.id
+                            # print doc1.signature
+                            # print doc2.signature
+                            # print
     print "{:,}".format(counter)
     print "{:,}".format(counter2)
 
 
-def jaccardSim(doc1, doc2, t, counter2):
+def jaccardSim(doc1, doc2, t):
     # Count similar elements in signature
     counterA = Counter(doc1.signature)
     counterB = Counter(doc2.signature)
@@ -273,42 +286,37 @@ def jaccardSim(doc1, doc2, t, counter2):
     union = len(doc1.signature) + len(doc2.signature) - intersection
 
     # For testing
-    if counter2 < 100:
-        print doc1.id, doc2.id
-        print counterA
-        print counterB
-        print intersection
-        print union
-        print float(intersection) / union
-    else:
-        sys.exit(0)
+    # if counter2 < 100:
+    #     print doc1.id, doc2.id
+    #     print counterA
+    #     print counterB
+    #     print intersection
+    #     print union
+    #     print float(intersection) / union
+    # else:
+    #     sys.exit(0)
 
     # Check if jaccard similarity is above t
     if float(intersection) / union >= t:
-        counter2 += 1
         doc1.similarTo.add(doc2)
         doc2.similarTo.add(doc1)
-    return counter2
 
 
-def euclideanDistance(doc1, doc2, counter2):
+def euclideanDistance(doc1, doc2):
     sig1, sig2 = doc1.signature, doc2.signature
-    counter2 += 1
-    lol = sum([(x-y)**2 for x, y in
-              itertools.izip(sig1, sig2)])
-    if counter2 < 100:
-        print doc1.id, doc2.id
-        print sig1
-        print sig2
-        print lol
-        print math.sqrt(lol)
-    else:
-        sys.exit(0)
+    # lol = sum([(x-y)**2 for x, y in itertools.izip(sig1, sig2)])
+    # if counter2 < 100:
+    #     print doc1.id, doc2.id
+    #     print sig1
+    #     print sig2
+    #     print lol
+    #     print math.sqrt(lol)
+    # else:
+    #     sys.exit(0)
 
-    # intersum = 0
-    # for x, y in itertools.izip(sig1, sig2):
-    #     intersum
-    return counter2
+    intersum = 0
+    for x, y in itertools.izip(sig1, sig2):
+        intersum
 
 
 def longest_common_substring(s1, s2):
@@ -325,22 +333,64 @@ def longest_common_substring(s1, s2):
                 m[x][y] = 0
     return s1[x_longest - longest: x_longest]
 
+
 # test_longest_common_substring
-def testLCS(doc1, doc2, counter2):
+def testLCS(doc1, doc2):
     sig1 = ''.join(map(str, doc1.signature))
     sig2 = ''.join(map(str, doc2.signature))
     seq = longest_common_substring(sig1, sig2)
-    counter2 += 1
-    #print (doc1.id, doc2.id),
-    if counter2 < 100:
-        print doc1.id, doc2.id
-        print sig1
-        print sig2
-        print seq
-        print
-    else:
-        sys.exit(0)
-    return counter2
+    # print (doc1.id, doc2.id),
+    # if counter2 < 100:
+    #     print doc1.id, doc2.id
+    #     print sig1
+    #     print sig2
+    #     print seq
+    #     print
+    # else:
+    #     sys.exit(0)
+    return seq
+
+
+def globalAlignment(doc1, doc2):
+    # scores
+    match = 1
+    mismatch = -1
+    indel = -2
+
+    # seqA = "abcd"
+    # seqB = "bcd"
+    seqA = doc1.dna
+    seqB = doc2.dna
+    scoreMatrix = [[0 for x in xrange(len(seqB)+1)] for x in
+                   xrange((len(seqA)+1))]
+    # scoreMatrix = [[0] * (1 + len(seqB)) for i in xrange(1 + len(seqA))]
+    for i in xrange(len(seqA)+1):
+        scoreMatrix[i][0] = i*indel
+
+    for j in xrange(len(seqB)+1):
+        scoreMatrix[0][j] = j*indel
+
+    for i in xrange(1, len(seqA)+1):
+        for j in xrange(1, len(seqB)+1):
+            if seqA[i-1] == seqB[j-1]:
+                score = scoreMatrix[i-1][j-1] + match
+            else:
+                score = scoreMatrix[i-1][j-1] + mismatch
+            opt1 = scoreMatrix[i-1][j] + indel
+            opt2 = scoreMatrix[i][j-1] + indel
+            maxi = opt1
+            if opt2 > maxi:
+                maxi = opt2
+            if score > maxi:
+                maxi = score
+            scoreMatrix[i][j] = maxi
+    # print seqA
+    # print seqB
+    # print scoreMatrix[len(seqA)][len(seqB)]
+    # for row in scoreMatrix:
+    #     print row
+
+    # sys.exit(0)
 
 
 # NOT relevant method, just for playing around #
@@ -371,6 +421,8 @@ def main():
     """
     totim = time.clock()
 
+    # globalAlignment("a","b",1)
+
     # Parse command line options #
     fasta_file, k, n, threshold, bands, rows = optionParse()
 
@@ -396,7 +448,7 @@ def main():
 
     print "Time used:", time.clock() - totim
 
-    findSimilarPairs(band_buckets, threshold)
+    findSimilarPairs(band_buckets, threshold, totim)
 
     # bucketSize(band_buckets)
 
