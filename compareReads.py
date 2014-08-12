@@ -74,7 +74,6 @@ def optionParse():
     parser.add_option("-n", "--n_length",
                       metavar="<VALUE>",
                       type=int,
-                      default=100,
                       action="store",
                       dest="n",
                       help="set <VALUE> as length of minhash signatures.")
@@ -234,17 +233,28 @@ def LSH(documents, bands, rows):
     #     for document in buckets[bucket]:
     #         print document.id,
     #     print
+    #     for document in buckets[bucket]:
+    #         print document.signature,
+    #     print
 
     return band_buckets
 
 
-def findSimilarPairs(band_buckets, t, totim):
+
+#*****************************************************************************#
+#                                                                             #
+#                            Similarity checkers                              #
+#                                                                             #
+#*****************************************************************************#
+def findSimilarPairs(band_buckets, t, totim, output):
     """
     Find candidate pairs that has a similarity above the threshold t
     """
     counter = 0
     counter2 = 0
     timer = time.clock()
+    bestMatches = []
+    #scoreMatrix = [[0] * (1 + 40) for i in xrange(1 + 40)]
     for buckets in band_buckets:
         for bucket in buckets:
             if len(buckets[bucket]) > 1:
@@ -255,12 +265,20 @@ def findSimilarPairs(band_buckets, t, totim):
                         # Check if doc1 and doc2 are candidate pairs
                         if doc1.isLeft != doc2.isLeft and doc1.id != doc2.id:
                             counter2 += 1
-                            # jaccardSim(doc1, doc2, t)
-                            # euclideanDistance(doc1, doc2)
-                            # testLCS(doc1, doc2)
                             if counter2 < 10000000:
-                                globalAlignment(doc1, doc2)
-                                if counter2 % 100000 == 0:
+                                # jaccardSim(doc1, doc2, t)
+                                # euclideanDistance(doc1, doc2)
+                                # testLCS(doc1, doc2)
+                                # NeedlemanWunsch(doc1, doc2)
+                                if doc1.isLeft:
+                                    bestMatch = globalAlignment(doc1, doc2)
+                                else:
+                                    bestMatch = globalAlignment(doc2, doc1)
+
+                                bestMatches.append(bestMatch)
+
+
+                                if counter2 % 500000 == 0:
                                     print "Processed", counter2, "pairs in", \
                                         "time:", time.clock() - timer
                             else:
@@ -274,6 +292,37 @@ def findSimilarPairs(band_buckets, t, totim):
                             # print
     print "{:,}".format(counter)
     print "{:,}".format(counter2)
+
+    with open(output, 'w') as f:
+        for match in bestMatches:
+            f.write(str(match)+"\n")
+
+
+def globalAlignment(doc1, doc2):
+    # dna1, dna2 = doc1.dna, doc2.dna
+    # print doc1.dna
+    # print len(doc1.dna)
+    # print doc2.dna
+    # print len(doc2.dna)
+    # print
+
+    start = 0
+    bestScore = (0,0,0)
+    while len(doc1.dna) - start > 10:
+        matches = 0
+        seqLength = len(doc1.dna)-start
+        for i in xrange(seqLength):
+            # print len(doc1.dna)-start
+            if doc1.dna[i] == doc2.dna[i+start]:
+                matches += 1
+        #print bestScore
+        score = matches / float(seqLength)
+        if score > bestScore[0]:
+           bestScore = (score, matches, seqLength)
+        # if score > bestScore:
+        #     bestScore = score
+        start += 1
+    return bestScore
 
 
 def jaccardSim(doc1, doc2, t):
@@ -351,7 +400,7 @@ def testLCS(doc1, doc2):
     return seq
 
 
-def globalAlignment(doc1, doc2):
+def NeedlemanWunsch(doc1, doc2):
     # scores
     match = 1
     mismatch = -1
@@ -361,9 +410,9 @@ def globalAlignment(doc1, doc2):
     # seqB = "bcd"
     seqA = doc1.dna
     seqB = doc2.dna
-    scoreMatrix = [[0 for x in xrange(len(seqB)+1)] for x in
-                   xrange((len(seqA)+1))]
-    # scoreMatrix = [[0] * (1 + len(seqB)) for i in xrange(1 + len(seqA))]
+    # scoreMatrix = [[0 for x in xrange(len(seqB)+1)] for x in
+    #               xrange((len(seqA)+1))]
+    scoreMatrix = [[0] * (1 + len(seqB)) for i in xrange(1 + len(seqA))]
     for i in xrange(len(seqA)+1):
         scoreMatrix[i][0] = i*indel
 
@@ -426,6 +475,9 @@ def main():
     # Parse command line options #
     fasta_file, k, n, threshold, bands, rows = optionParse()
 
+    if not n:
+        n = bands*rows
+
     if bands*rows != n:
         print "ERROR: bands * rows do not equal n (number of hash functions)"
         sys.exit(0)
@@ -448,7 +500,8 @@ def main():
 
     print "Time used:", time.clock() - totim
 
-    findSimilarPairs(band_buckets, threshold, totim)
+    output = "output_k_"+str(k)+"_b_"+str(bands)+"_r_"+str(rows)+".txt"
+    findSimilarPairs(band_buckets, threshold, totim, output)
 
     # bucketSize(band_buckets)
 
