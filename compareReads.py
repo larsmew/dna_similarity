@@ -8,6 +8,7 @@ __date__ = "03/07/2014"
 __version__ = "$Revision: 1.0"
 
 from optparse import OptionParser
+from operator import itemgetter
 from collections import Counter
 import itertools
 import sys
@@ -276,7 +277,8 @@ def findSimilarPairs(band_buckets, t, totim, output):
                                     bestMatch = globalAlignment(doc2, doc1)
 
                                 bestMatches.append(bestMatch)
-
+                                if bestMatch[2] < 10:
+                                    print bestMatch
 
                                 if counter2 % 500000 == 0:
                                     print "Processed", counter2, "pairs in", \
@@ -284,6 +286,15 @@ def findSimilarPairs(band_buckets, t, totim, output):
                             else:
                                 print "Total time used (in secs):", \
                                     time.clock() - totim
+                                #print bestMatches
+                                bestMatches.sort(key=itemgetter(0), reverse=False)
+                                #print bestMatches
+                                with open("output.txt", 'w') as f:
+                                    counter = 0
+                                    for match in bestMatches:
+                                        f.write(str(counter)+","+str(match[0])+"\n")
+                                        counter += 1
+                                        #f.write(str(match[0])+" "+str(match[1])+" "+str(match[2])+"\n")
                                 sys.exit()
                             # print doc1.dna, doc1.id
                             # print doc2.dna, doc2.id
@@ -293,9 +304,12 @@ def findSimilarPairs(band_buckets, t, totim, output):
     print "{:,}".format(counter)
     print "{:,}".format(counter2)
 
+    bestMatches.sort(key=itemgetter(0), reverse=False)
     with open(output, 'w') as f:
+        counter = 0
         for match in bestMatches:
-            f.write(str(match)+"\n")
+            f.write(str(counter)+" "+str(match[0])+" "+str(match[1])+" "+str(match[2])+"\n")
+            counter += 1
 
 
 def globalAlignment(doc1, doc2):
@@ -308,9 +322,10 @@ def globalAlignment(doc1, doc2):
 
     start = 0
     bestScore = (0,0,0)
-    while len(doc1.dna) - start > 10:
+    seqLength = len(doc1.dna)-start
+    while seqLength > 10 and bestScore[0] != 1.0:#and seqLength >= bestScore[1]:
+        #print seqLength, bestScore[1]
         matches = 0
-        seqLength = len(doc1.dna)-start
         for i in xrange(seqLength):
             # print len(doc1.dna)-start
             if doc1.dna[i] == doc2.dna[i+start]:
@@ -318,10 +333,13 @@ def globalAlignment(doc1, doc2):
         #print bestScore
         score = matches / float(seqLength)
         if score > bestScore[0]:
-           bestScore = (score, matches, seqLength)
+            #print score, bestScore[0]
+            #print seqLength, matches, bestScore[1]
+            bestScore = (score, matches, seqLength)
         # if score > bestScore:
         #     bestScore = score
         start += 1
+        seqLength = len(doc1.dna)-start
     return bestScore
 
 
@@ -500,8 +518,9 @@ def main():
 
     print "Time used:", time.clock() - totim
 
+    output_path = "output/output_k_"+str(k)+"_b_"+str(bands)+"_r_"+str(rows)+"/"
     output = "output_k_"+str(k)+"_b_"+str(bands)+"_r_"+str(rows)+".txt"
-    findSimilarPairs(band_buckets, threshold, totim, output)
+    findSimilarPairs(band_buckets, threshold, totim, output_path+output)
 
     # bucketSize(band_buckets)
 
