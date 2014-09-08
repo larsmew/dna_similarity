@@ -102,11 +102,19 @@ def optionParse():
                       action="store",
                       dest="rows",
                       help="set <VALUE> as the number of rows for LSH.")
+                      
+    parser.add_option("-s", "--similarity_measure",
+                      metavar="<VALUE>",
+                      type=str,
+                      default="naive",
+                      action="store",
+                      dest="s",
+                      help="set <VALUE> as similairy measure to use.")
 
     (options, args) = parser.parse_args()
 
     return options.fasta_file, options.k, options.n, options.threshold,\
-        options.bands, options.rows
+        options.bands, options.rows, options.s
 
 
 def readData(fasta_file):
@@ -247,7 +255,7 @@ def LSH(documents, bands, rows):
 #                            Similarity checkers                              #
 #                                                                             #
 #*****************************************************************************#
-def findSimilarPairs(band_buckets, t, totim, output):
+def findSimilarPairs(band_buckets, t, totim, output, numReads, sim_measure):
     """
     Find candidate pairs that has a similarity above the threshold t
     """
@@ -255,7 +263,6 @@ def findSimilarPairs(band_buckets, t, totim, output):
     counter2 = 0
     timer = time.clock()
     bestMatches = []
-    #scoreMatrix = [[0] * (1 + 40) for i in xrange(1 + 40)]
     for buckets in band_buckets:
         for bucket in buckets:
             if len(buckets[bucket]) > 1:
@@ -267,18 +274,21 @@ def findSimilarPairs(band_buckets, t, totim, output):
                         if doc1.isLeft != doc2.isLeft and doc1.id != doc2.id:
                             counter2 += 1
                             if counter2 < 10000000:
-                                # jaccardSim(doc1, doc2, t)
                                 # euclideanDistance(doc1, doc2)
                                 # testLCS(doc1, doc2)
                                 # NeedlemanWunsch(doc1, doc2)
                                 if doc1.isLeft:
-                                    bestMatch = globalAlignment(doc1, doc2)
+                                    if sim_measure == "naive":
+                                        bestMatch = globalAlignment(doc1, doc2)
+                                    elif sim_measure == "jaccard":
+                                        bestMatch = jaccardSim(doc1, doc2)
                                 else:
-                                    bestMatch = globalAlignment(doc2, doc1)
+                                    if sim_measure == "naive":
+                                        bestMatch = globalAlignment(doc2, doc1)
+                                    elif sim_measure == "jaccard":
+                                        bestMatch = jaccardSim(doc2, doc1)
 
                                 bestMatches.append(bestMatch)
-                                if bestMatch[2] < 10:
-                                    print bestMatch
 
                                 if counter2 % 500000 == 0:
                                     print "Processed", counter2, "pairs in", \
@@ -286,29 +296,37 @@ def findSimilarPairs(band_buckets, t, totim, output):
                             else:
                                 print "Total time used (in secs):", \
                                     time.clock() - totim
-                                #print bestMatches
-                                bestMatches.sort(key=itemgetter(0), reverse=False)
-                                #print bestMatches
+                                bestMatches.sort(key=itemgetter(0),
+                                                 reverse=False)
                                 with open("output.txt", 'w') as f:
                                     counter = 0
                                     for match in bestMatches:
-                                        f.write(str(counter)+","+str(match[0])+"\n")
+                                        f.write(str(counter) + "," + 
+                                                str(match[0])+"\n")
                                         counter += 1
-                                        #f.write(str(match[0])+" "+str(match[1])+" "+str(match[2])+"\n")
                                 sys.exit()
-                            # print doc1.dna, doc1.id
-                            # print doc2.dna, doc2.id
-                            # print doc1.signature
-                            # print doc2.signature
-                            # print
+
+    processing_time = time.clock() - timer
+    print "Processed", counter2, "pairs in time:", processing_time
     print "{:,}".format(counter)
     print "{:,}".format(counter2)
 
-    bestMatches.sort(key=itemgetter(0), reverse=False)
+    if sim_measure == "naive":
+        bestMatches.sort(key=itemgetter(0), reverse=False)
+    elif sim_measure == "jaccard":
+        bestMatches.sort()
+    
     with open(output, 'w') as f:
+        maxNumPairs = numReads*(numReads-1)/2
+        f.write(str(numReads) + " " + str(maxNumPairs) + " " +
+                str(counter2) + " " + str(processing_time) + "\n")
         counter = 0
         for match in bestMatches:
-            f.write(str(counter)+" "+str(match[0])+" "+str(match[1])+" "+str(match[2])+"\n")
+            if sim_measure == "naive":
+                f.write(str(counter) + " " + str(match[0]) + " " +
+                        str(match[1]) + " " + str(match[2]) + "\n")
+            elif sim_measure == "jaccard":
+                f.write(str(counter) + " " + str(match) + "\n")
             counter += 1
 
 
@@ -323,7 +341,7 @@ def globalAlignment(doc1, doc2):
     start = 0
     bestScore = (0,0,0)
     seqLength = len(doc1.dna)-start
-    while seqLength > 10 and bestScore[0] != 1.0:#and seqLength >= bestScore[1]:
+    while seqLength > 10 and bestScore[0] != 1.0:
         #print seqLength, bestScore[1]
         matches = 0
         for i in xrange(seqLength):
@@ -343,30 +361,56 @@ def globalAlignment(doc1, doc2):
     return bestScore
 
 
-def jaccardSim(doc1, doc2, t):
-    # Count similar elements in signature
-    counterA = Counter(doc1.signature)
-    counterB = Counter(doc2.signature)
-    # Find intersection of elements in doc1 and doc2
-    intersection = sum((counterA & counterB).values())
-    # Find union of elements in doc1 and doc2
-    union = len(doc1.signature) + len(doc2.signature) - intersection
+def jaccardSim(doc1, doc2):
+    intersection = doc1.shingles.intersection(doc2.shingles)
+    if len(intersection) == 0:
+        return 0
+    union = doc1.shingles.union(doc2.shingles)
+    return float(len(intersection)) / len(union)
+    
+    # start = 0
+    # bestScore = 0
+    # seqLength = len(doc1.dna)-start
+    # while seqLength > 10 and bestScore != 1.0:
+    #
+    #     # print seqLength
+    #     # print doc1.dna
+    #     # print doc2.dna
+    #     # print doc1.dna[:seqLength]
+    #     # print doc2.dna[-seqLength:]
+    #
+    #     # Count similar elements in signature
+    #     counterA = Counter(doc1.dna[:seqLength])
+    #     counterB = Counter(doc2.dna[-seqLength:])
+    #     # Find intersection of elements in doc1 and doc2
+    #     intersection = sum((counterA & counterB).values())
+    #     # Find union of elements in doc1 and doc2
+    #     #union = len(doc1.dna) + len(doc2.dna) - intersection
+    #     union = 2 * seqLength - intersection
+    #
+    #     score = float(intersection) / union
+    #     if score > bestScore:
+    #         bestScore = score
+    #
+    #     start += 1
+    #     seqLength = len(doc1.dna)-start
+    #
+    # return bestScore
 
     # For testing
-    # if counter2 < 100:
-    #     print doc1.id, doc2.id
-    #     print counterA
-    #     print counterB
-    #     print intersection
-    #     print union
-    #     print float(intersection) / union
-    # else:
-    #     sys.exit(0)
+    # print doc1.id, doc2.id
+    # print doc1.dna
+    # print doc2.dna
+    # print counterA
+    # print counterB
+    # print intersection
+    # print union
+    # print float(intersection) / union
 
     # Check if jaccard similarity is above t
-    if float(intersection) / union >= t:
-        doc1.similarTo.add(doc2)
-        doc2.similarTo.add(doc1)
+    # if float(intersection) / union >= t:
+    #     doc1.similarTo.add(doc2)
+    #     doc2.similarTo.add(doc1)
 
 
 def euclideanDistance(doc1, doc2):
@@ -488,10 +532,8 @@ def main():
     """
     totim = time.clock()
 
-    # globalAlignment("a","b",1)
-
-    # Parse command line options #
-    fasta_file, k, n, threshold, bands, rows = optionParse()
+    # Parse command line options
+    fasta_file, k, n, threshold, bands, rows, sim_measure = optionParse()
 
     if not n:
         n = bands*rows
@@ -500,27 +542,72 @@ def main():
         print "ERROR: bands * rows do not equal n (number of hash functions)"
         sys.exit(0)
 
-    # Read all reads from fasta file #
-    reads = readData(fasta_file)
+    # Read all reads from fasta file
+    reads = readData(fasta_file)            
 
     documents = createDocuments(reads)
     # for doc in documents:
     #     print doc.dna, doc.id, doc.isLeft
-
+    
     shingles = list(shingling(documents, k))
-
     # print shingles
     # print len(shingles)
 
-    minhashing(documents, shingles, n)
+    numReads = "{:,}".format(len(reads)).replace(",",".")
+    print "Number of reads:", numReads
+    print "Number of documents:", "{:,}".format(len(documents)).replace(",",".")
+    numPairs = len(reads) * (len(reads)-1)
+    strNumPairs = format(numPairs, ',d').replace(",",".")
+    print "Number of pairs to process:", strNumPairs
+    bestMatches = []
+    counter = 0
+    timer = time.clock()
+    for i in xrange(0, len(documents)):
+        for j in xrange(i+1, len(documents)):
+            doc1, doc2 = documents[i], documents[j]
+            # Check if doc1 and doc2 are candidate pairs
+            if doc1.isLeft != doc2.isLeft and doc1.id != doc2.id:
+                counter += 1
+                if doc1.isLeft:
+                    #bestMatch_naive = globalAlignment(doc1, doc2)
+                    bestMatch_jaccard = jaccardSim(doc1, doc2)
+                else:
+                    #bestMatch_naive = globalAlignment(doc2, doc1)
+                    bestMatch_jaccard = jaccardSim(doc2, doc1)
+                #bestMatches.append((bestMatch_naive[0], bestMatch_jaccard))
+                bestMatches.append(bestMatch_jaccard)
+                
+                if counter % 200000 == 0:
+                    print "Processed", format(counter, ',d').replace(",","."), \
+                          "of", strNumPairs, "pairs in time (minutes):", \
+                          (time.clock() - timer) / 60
+                    
+    # bestMatches.sort(key=itemgetter(0), reverse=False)
+    # with open("all_pairs_naive.txt", 'w') as f:
+    #     f.write(str(counter)+'\n')
+    #     for match in bestMatches:
+    #         f.write(str(match[0])+' '+str(match[1])+'\n')
 
-    band_buckets = LSH(documents, bands, rows)
+    #bestMatches.sort(key=itemgetter(1), reverse=False)
+    with open("all_pairs_jaccard_normal.txt", 'w') as f:
+        f.write(str(counter)+' '+str(numReads)+' '+str(time.clock()-timer)+'\n')
+        for match in bestMatches:
+            #f.write(str(match[0])+' '+str(match[1])+'\n')
+            f.write(str(match)+'\n')
 
-    print "Time used:", time.clock() - totim
-
-    output_path = "output/output_k_"+str(k)+"_b_"+str(bands)+"_r_"+str(rows)+"/"
-    output = "output_k_"+str(k)+"_b_"+str(bands)+"_r_"+str(rows)+".txt"
-    findSimilarPairs(band_buckets, threshold, totim, output_path+output)
+    # minhashing(documents, shingles, n)
+    #
+    # band_buckets = LSH(documents, bands, rows)
+    #
+    # print "Time used:", time.clock() - totim
+    #
+    # output_path = ("output_"+sim_measure+"/output_k_" + str(k) + "_b_" +
+    #                str(bands) + "_r_" + str(rows) + "/")
+    # output_file = "output_k_"+str(k)+"_b_"+str(bands)+"_r_"+str(rows)+".txt"
+    # output = output_path + output_file
+    # numReads = len(reads)
+    # findSimilarPairs(band_buckets, threshold, totim, output, numReads,
+    #                  sim_measure)
 
     # bucketSize(band_buckets)
 
