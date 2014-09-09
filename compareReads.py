@@ -29,6 +29,7 @@ class Document(object):
     id = 0
     isLeft = False  # If document comes from the left or right part of a read
     shingles = set()
+    counterShingles = None
     signature = []
     similarTo = set()
 
@@ -168,6 +169,7 @@ def shingling(docs, k):
     shingles = set()  # Contains all k-shingles in the dataset
     for doc in docs:
         docShingles = set()  # Contains the k-shingles in the given document
+        counterShingles = []
         for i in xrange(len(doc.dna)-k):
             # create k-shingle (substring) from the document
             shingle = doc.dna[i:i+k]
@@ -175,8 +177,12 @@ def shingling(docs, k):
             shingles.add(shingle)
             # Add it to the set of shingles of the current document
             docShingles.add(shingle)
+            counterShingles.append(shingle)
+        
+        doc.counterShingles = Counter(counterShingles)
         # Store the document's shingles in the document object
         doc.shingles = docShingles
+        
         # print docShingles,"\n"
     return shingles
 
@@ -339,9 +345,9 @@ def globalAlignment(doc1, doc2):
     # print
 
     start = 0
-    bestScore = (0,0,0)
+    bestScore = 0 #(0,0,0)
     seqLength = len(doc1.dna)-start
-    while seqLength > 10 and bestScore[0] != 1.0:
+    while seqLength > 10 and bestScore != 1.0: #and bestScore[0] != 1.0:
         #print seqLength, bestScore[1]
         matches = 0
         for i in xrange(seqLength):
@@ -350,10 +356,10 @@ def globalAlignment(doc1, doc2):
                 matches += 1
         #print bestScore
         score = matches / float(seqLength)
-        if score > bestScore[0]:
+        if score > bestScore: #bestScore[0]:
             #print score, bestScore[0]
             #print seqLength, matches, bestScore[1]
-            bestScore = (score, matches, seqLength)
+            bestScore = score #(score, matches, seqLength)
         # if score > bestScore:
         #     bestScore = score
         start += 1
@@ -362,12 +368,23 @@ def globalAlignment(doc1, doc2):
 
 
 def jaccardSim(doc1, doc2):
-    intersection = doc1.shingles.intersection(doc2.shingles)
-    if len(intersection) == 0:
+    ### Bag jaccard sim ###
+    counterA = doc1.counterShingles
+    counterB = doc2.counterShingles
+    intersection = sum((counterA & counterB).values())
+    if intersection == 0:
         return 0
-    union = doc1.shingles.union(doc2.shingles)
-    return float(len(intersection)) / len(union)
-    
+    union = len(doc1.dna) + len(doc2.dna) - intersection
+    return float(intersection) / union
+
+    ### standard jaccard sim ###
+    # intersection = doc1.shingles.intersection(doc2.shingles)
+    # if len(intersection) == 0:
+    #     return 0
+    # union = doc1.shingles.union(doc2.shingles)
+    # return float(len(intersection)) / len(union)
+
+    ### bp level jaccard sim - bag ###
     # start = 0
     # bestScore = 0
     # seqLength = len(doc1.dna)-start
@@ -396,21 +413,6 @@ def jaccardSim(doc1, doc2):
     #     seqLength = len(doc1.dna)-start
     #
     # return bestScore
-
-    # For testing
-    # print doc1.id, doc2.id
-    # print doc1.dna
-    # print doc2.dna
-    # print counterA
-    # print counterB
-    # print intersection
-    # print union
-    # print float(intersection) / union
-
-    # Check if jaccard similarity is above t
-    # if float(intersection) / union >= t:
-    #     doc1.similarTo.add(doc2)
-    #     doc2.similarTo.add(doc1)
 
 
 def euclideanDistance(doc1, doc2):
@@ -525,6 +527,49 @@ def bucketSize(band_buckets):
         # 3640087
         # 3768266
 
+def compareAllPairs(reads, documents):
+    numReads = "{:,}".format(len(reads)).replace(",",".")
+    print "Number of reads:", numReads
+    print "Number of documents:", "{:,}".format(len(documents)).replace(",",".")
+    numPairs = len(reads) * (len(reads)-1)
+    strNumPairs = format(numPairs, ',d').replace(",",".")
+    print "Number of pairs to process:", strNumPairs
+    bestMatches = []
+    counter = 0
+    timer = time.clock()
+    for i in xrange(0, len(documents)):
+        for j in xrange(i+1, len(documents)):
+            doc1, doc2 = documents[i], documents[j]
+            # Check if doc1 and doc2 are candidate pairs
+            if doc1.isLeft != doc2.isLeft and doc1.id != doc2.id:
+                counter += 1
+                if doc1.isLeft:
+                    #bestMatch_naive = globalAlignment(doc1, doc2)
+                    bestMatch_jaccard = jaccardSim(doc1, doc2)
+                else:
+                    #bestMatch_naive = globalAlignment(doc2, doc1)
+                    bestMatch_jaccard = jaccardSim(doc2, doc1)
+                #bestMatches.append((bestMatch_naive[0], bestMatch_jaccard))
+                bestMatches.append(bestMatch_jaccard)
+
+                if counter % 200000 == 0:
+                    print "Processed", format(counter, ',d').replace(",","."), \
+                          "of", strNumPairs, "pairs in time (minutes):", \
+                          (time.clock() - timer) / 60
+                    
+    # bestMatches.sort(key=itemgetter(0), reverse=False)
+    # with open("all_pairs_naive.txt", 'w') as f:
+    #     f.write(str(counter)+'\n')
+    #     for match in bestMatches:
+    #         f.write(str(match[0])+' '+str(match[1])+'\n')
+
+    bestMatches.sort(key=itemgetter(1), reverse=False)
+    with open("all_pairs_jaccard_normal_k_"+str(k)+".txt", 'w') as f:
+        f.write(str(counter)+' '+str(numReads)+' '+str(time.clock()-timer)+'\n')
+        for match in bestMatches:
+            #f.write(str(match[0])+' '+str(match[1])+'\n')
+            f.write(str(match)+'\n')
+
 
 def main():
     """
@@ -553,61 +598,21 @@ def main():
     # print shingles
     # print len(shingles)
 
-    numReads = "{:,}".format(len(reads)).replace(",",".")
-    print "Number of reads:", numReads
-    print "Number of documents:", "{:,}".format(len(documents)).replace(",",".")
-    numPairs = len(reads) * (len(reads)-1)
-    strNumPairs = format(numPairs, ',d').replace(",",".")
-    print "Number of pairs to process:", strNumPairs
-    bestMatches = []
-    counter = 0
-    timer = time.clock()
-    for i in xrange(0, len(documents)):
-        for j in xrange(i+1, len(documents)):
-            doc1, doc2 = documents[i], documents[j]
-            # Check if doc1 and doc2 are candidate pairs
-            if doc1.isLeft != doc2.isLeft and doc1.id != doc2.id:
-                counter += 1
-                if doc1.isLeft:
-                    #bestMatch_naive = globalAlignment(doc1, doc2)
-                    bestMatch_jaccard = jaccardSim(doc1, doc2)
-                else:
-                    #bestMatch_naive = globalAlignment(doc2, doc1)
-                    bestMatch_jaccard = jaccardSim(doc2, doc1)
-                #bestMatches.append((bestMatch_naive[0], bestMatch_jaccard))
-                bestMatches.append(bestMatch_jaccard)
-                
-                if counter % 200000 == 0:
-                    print "Processed", format(counter, ',d').replace(",","."), \
-                          "of", strNumPairs, "pairs in time (minutes):", \
-                          (time.clock() - timer) / 60
-                    
-    # bestMatches.sort(key=itemgetter(0), reverse=False)
-    # with open("all_pairs_naive.txt", 'w') as f:
-    #     f.write(str(counter)+'\n')
-    #     for match in bestMatches:
-    #         f.write(str(match[0])+' '+str(match[1])+'\n')
+    #compareAllPairs(reads, documents)
 
-    #bestMatches.sort(key=itemgetter(1), reverse=False)
-    with open("all_pairs_jaccard_normal.txt", 'w') as f:
-        f.write(str(counter)+' '+str(numReads)+' '+str(time.clock()-timer)+'\n')
-        for match in bestMatches:
-            #f.write(str(match[0])+' '+str(match[1])+'\n')
-            f.write(str(match)+'\n')
+    minhashing(documents, shingles, n)
 
-    # minhashing(documents, shingles, n)
-    #
-    # band_buckets = LSH(documents, bands, rows)
-    #
-    # print "Time used:", time.clock() - totim
-    #
-    # output_path = ("output_"+sim_measure+"/output_k_" + str(k) + "_b_" +
-    #                str(bands) + "_r_" + str(rows) + "/")
-    # output_file = "output_k_"+str(k)+"_b_"+str(bands)+"_r_"+str(rows)+".txt"
-    # output = output_path + output_file
-    # numReads = len(reads)
-    # findSimilarPairs(band_buckets, threshold, totim, output, numReads,
-    #                  sim_measure)
+    band_buckets = LSH(documents, bands, rows)
+
+    print "Time used:", time.clock() - totim
+
+    output_path = ("output_"+sim_measure+"/output_k_" + str(k) + "_b_" +
+                   str(bands) + "_r_" + str(rows) + "/")
+    output_file = "output_k_"+str(k)+"_b_"+str(bands)+"_r_"+str(rows)+".txt"
+    output = output_path + output_file
+    numReads = len(reads)
+    findSimilarPairs(band_buckets, threshold, totim, output, numReads,
+                     sim_measure)
 
     # bucketSize(band_buckets)
 
