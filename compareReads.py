@@ -19,6 +19,7 @@ import random
 # import numpy
 # import nwalign as nw
 
+
 # *************************************************************************** #
 #                                                                             #
 #                                Data structure                               #
@@ -50,6 +51,7 @@ def createDocument(dna, id, isLeft):
     """
     document = Document(dna, id, isLeft)
     return document
+
 
 # *************************************************************************** #
 #                                                                             #
@@ -104,7 +106,7 @@ def optionParse():
                       action="store",
                       dest="rows",
                       help="set <VALUE> as the number of rows for LSH.")
-                      
+
     parser.add_option("-m", "--similarity_measure",
                       metavar="<VALUE>",
                       type=str,
@@ -112,7 +114,7 @@ def optionParse():
                       action="store",
                       dest="m",
                       help="set <VALUE> as similairy measure to use.")
-                      
+
     parser.add_option("-s", "--seed",
                       metavar="<VALUE>",
                       type=int,
@@ -191,11 +193,11 @@ def shingling(docs, k):
             # Add it to the set of shingles of the current document
             docShingles.add(shingle)
             counterShingles.append(shingle)
-        
+
         doc.counterShingles = Counter(counterShingles)
         # Store the document's shingles in the document object
         doc.shingles = docShingles
-        
+
         # print docShingles,"\n"
     return shingles
 
@@ -269,7 +271,6 @@ def LSH(documents, bands, rows):
     return band_buckets
 
 
-
 # *************************************************************************** #
 #                                                                             #
 #                             Similarity checkers                             #
@@ -311,8 +312,8 @@ def findSimilarPairs(band_buckets, t, totim, output, numReads, sim_measure):
                                 bestMatches.append(bestMatch)
 
                                 if counter2 % 500000 == 0:
-                                    c = format(counter2, ',d').replace(",", ".")
-                                    print "Processed", c, "pairs in", \
+                                    print "Processed", format(counter2, ',d') \
+                                        .replace(",", "."), "pairs in", \
                                         "time:", time.clock() - timer
                             else:
                                 print "Total time used (in secs):", \
@@ -322,22 +323,23 @@ def findSimilarPairs(band_buckets, t, totim, output, numReads, sim_measure):
                                 with open("output.txt", 'w') as f:
                                     counter = 0
                                     for match in bestMatches:
-                                        f.write(str(counter) + "," + 
+                                        f.write(str(counter) + "," +
                                                 str(match[0])+"\n")
                                         counter += 1
                                 sys.exit()
 
     processing_time = time.clock() - timer
-    c = "{:,}".format(counter2).replace(",",".")
+    c = "{:,}".format(counter2).replace(",", ".")
     print "Processed", c, "pairs in time:", processing_time
-    print "{:,}".format(counter).replace(",",".")
+    print "{:,}".format(counter).replace(",", ".")
     print c
 
     # if sim_measure == "naive":
     #     bestMatches.sort(key=itemgetter(0), reverse=False)
     # elif sim_measure == "jaccard":
+
     bestMatches.sort()
-    
+
     # with open(output, 'w') as f:
     #     maxNumPairs = numReads*(numReads-1)/2
     #     f.write(str(numReads) + " " + str(maxNumPairs) + " " +
@@ -355,8 +357,8 @@ def findSimilarPairs(band_buckets, t, totim, output, numReads, sim_measure):
 
 def globalAlignment(doc1, doc2):
     """
-    Aligning sequences by using a sliding window approach. 
-    Returns the best score (matches / seqlength) between the two sequences
+    Aligning sequences by using a sliding window approach.
+    Returns the best score (matches / seqlength) between the two sequences.
     """
     # dna1, dna2 = doc1.dna, doc2.dna
     # print doc1.dna
@@ -366,21 +368,21 @@ def globalAlignment(doc1, doc2):
     # print
 
     start = 0
-    bestScore = 0 #(0,0,0)
+    bestScore = 0  # (0,0,0)
     seqLength = len(doc1.dna)-start
-    while seqLength > 10 and bestScore != 1.0: #and bestScore[0] != 1.0:
-        #print seqLength, bestScore[1]
+    while seqLength > 10 and bestScore != 1.0:  # and bestScore[0] != 1.0:
+        # print seqLength, bestScore[1]
         matches = 0
         for i in xrange(seqLength):
             # print len(doc1.dna)-start
             if doc1.dna[i] == doc2.dna[i+start]:
                 matches += 1
-        #print bestScore
+        # print bestScore
         score = matches / float(seqLength)
-        if score > bestScore: #bestScore[0]:
-            #print score, bestScore[0]
-            #print seqLength, matches, bestScore[1]
-            bestScore = score #(score, matches, seqLength)
+        if score > bestScore:  # bestScore[0]:
+            # print score, bestScore[0]
+            # print seqLength, matches, bestScore[1]
+            bestScore = score  # (score, matches, seqLength)
         # if score > bestScore:
         #     bestScore = score
         start += 1
@@ -393,7 +395,7 @@ def jaccardSim(doc1, doc2):
     Computing the jaccard similarity.
     Option to use jaccard bag similarity or standard jaccard similarity.
     """
-    ### Bag jaccard sim ###
+    # ## Bag jaccard sim ###
     counterA = doc1.counterShingles
     counterB = doc2.counterShingles
     intersection = sum((counterA & counterB).values())
@@ -402,14 +404,14 @@ def jaccardSim(doc1, doc2):
     union = len(doc1.dna) + len(doc2.dna) - intersection
     return float(intersection) / union
 
-    ### standard jaccard sim ###
+    # ## standard jaccard sim ###
     # intersection = doc1.shingles.intersection(doc2.shingles)
     # if len(intersection) == 0:
     #     return 0
     # union = doc1.shingles.union(doc2.shingles)
     # return float(len(intersection)) / len(union)
 
-    ### bp level jaccard sim - bag ###
+    # ## bp level jaccard sim - bag ###
     # start = 0
     # bestScore = 0
     # seqLength = len(doc1.dna)-start
@@ -561,12 +563,13 @@ def bucketSize(band_buckets):
         # 3640087
         # 3768266
 
+
 def compareAllPairs(reads, documents, k):
-    numReads = "{:,}".format(len(reads)).replace(",",".")
+    numReads = format(len(reads), ',d').replace(",", ".")
     print "Number of reads:", numReads
-    print "Number of documents:", "{:,}".format(len(documents)).replace(",",".")
+    print "Number of docs:", format(len(documents), ',d').replace(",", ".")
     numPairs = len(reads) * (len(reads)-1)
-    strNumPairs = format(numPairs, ',d').replace(",",".")
+    strNumPairs = format(numPairs, ',d').replace(",", ".")
     print "Number of pairs to process:", strNumPairs
     bestMatches = []
     counter = 0
@@ -578,29 +581,31 @@ def compareAllPairs(reads, documents, k):
             if doc1.isLeft != doc2.isLeft and doc1.id != doc2.id:
                 counter += 1
                 if doc1.isLeft:
-                    #bestMatch_naive = globalAlignment(doc1, doc2)
+                    # bestMatch_naive = globalAlignment(doc1, doc2)
                     bestMatch_jaccard = jaccardSim(doc1, doc2)
                 else:
-                    #bestMatch_naive = globalAlignment(doc2, doc1)
+                    # bestMatch_naive = globalAlignment(doc2, doc1)
                     bestMatch_jaccard = jaccardSim(doc2, doc1)
-                #bestMatches.append((bestMatch_naive[0], bestMatch_jaccard))
+                # bestMatches.append((bestMatch_naive[0], bestMatch_jaccard))
                 bestMatches.append(bestMatch_jaccard)
 
                 if counter % 200000 == 0:
-                    print "Processed", format(counter, ',d').replace(",","."), \
+                    print "Processed", format(counter, ',d').replace(",", "."),\
                           "of", strNumPairs, "pairs in time (minutes):", \
                           (time.clock() - timer) / 60
-                    
+
     # with open("all_pairs_naive.txt", 'w') as f:
     #     f.write(str(counter)+'\n')
     #     for match in bestMatches:
     #         f.write(str(match[0])+' '+str(match[1])+'\n')
 
     with open("all_pairs_jaccard_standard_k_"+str(k)+".txt", 'w') as f:
-        f.write(str(counter)+' '+str(numReads)+' '+str(time.clock()-timer)+'\n')
+        f.write(str(counter) + ' ' + str(numReads) + ' ' +
+                str(time.clock()-timer) + '\n')
         for match in bestMatches:
-            #f.write(str(match[0])+' '+str(match[1])+'\n')
+            # f.write(str(match[0])+' '+str(match[1])+'\n')
             f.write(str(match)+'\n')
+
 
 # *************************************************************************** #
 #                                                                             #
@@ -630,12 +635,12 @@ def main():
     documents = createDocuments(reads)
     # for doc in documents:
     #     print doc.dna, doc.id, doc.isLeft
-    
+
     shingles = list(shingling(documents, k))
     # print shingles
     # print len(shingles)
 
-    #compareAllPairs(reads, documents, k)
+    # compareAllPairs(reads, documents, k)
 
     print "Seed:", seed
     minhashing(documents, shingles, n, seed)
@@ -648,11 +653,10 @@ def main():
                    str(bands) + "_r_" + str(rows) + "/")
     output_file = "output_k_"+str(k)+"_b_"+str(bands)+"_r_"+str(rows)+".txt"
     output = output_path + output_file
-    numReads = len(reads)
-    findSimilarPairs(band_buckets, threshold, totim, output, numReads,
+    findSimilarPairs(band_buckets, threshold, totim, output, len(reads),
                      sim_measure)
 
-    #bucketSize(band_buckets)
+    # bucketSize(band_buckets)
 
     print "Total time used (in secs):", time.clock() - totim
 
