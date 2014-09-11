@@ -4,8 +4,8 @@
 # from __future__ import print_function
 
 __author__ = "Lars Andersen <larsmew@gmail.com>"
-__date__ = "03/07/2014"
-__version__ = "$Revision: 1.0"
+__date__ = "11/09/2014"
+__version__ = "$Revision: 1.1"
 
 from optparse import OptionParser
 from operator import itemgetter
@@ -19,7 +19,11 @@ import random
 # import numpy
 # import nwalign as nw
 
-
+# *************************************************************************** #
+#                                                                             #
+#                                Data structure                               #
+#                                                                             #
+# *************************************************************************** #
 class Document(object):
     """
     Defines the data structure of a document. Like dna sequence, id, left or
@@ -47,7 +51,11 @@ def createDocument(dna, id, isLeft):
     document = Document(dna, id, isLeft)
     return document
 
-
+# *************************************************************************** #
+#                                                                             #
+#                                   Helpers                                   #
+#                                                                             #
+# *************************************************************************** #
 def optionParse():
     """
     Parse arguments from command line.
@@ -73,13 +81,6 @@ def optionParse():
                       dest="k",
                       help="set <VALUE> as size for k-shingles.")
 
-    parser.add_option("-n", "--n_length",
-                      metavar="<VALUE>",
-                      type=int,
-                      action="store",
-                      dest="n",
-                      help="set <VALUE> as length of minhash signatures.")
-
     parser.add_option("-t", "--threshold",
                       metavar="<VALUE>",
                       type=float,
@@ -104,18 +105,25 @@ def optionParse():
                       dest="rows",
                       help="set <VALUE> as the number of rows for LSH.")
                       
-    parser.add_option("-s", "--similarity_measure",
+    parser.add_option("-m", "--similarity_measure",
                       metavar="<VALUE>",
                       type=str,
                       default="naive",
                       action="store",
-                      dest="s",
+                      dest="m",
                       help="set <VALUE> as similairy measure to use.")
+                      
+    parser.add_option("-s", "--seed",
+                      metavar="<VALUE>",
+                      type=int,
+                      action="store",
+                      dest="s",
+                      help="set <VALUE> as seed for hash functions.")
 
     (options, args) = parser.parse_args()
 
-    return options.fasta_file, options.k, options.n, options.threshold,\
-        options.bands, options.rows, options.s
+    return options.fasta_file, options.k, options.threshold,\
+        options.bands, options.rows, options.m, options.s
 
 
 def readData(fasta_file):
@@ -144,6 +152,11 @@ def readData(fasta_file):
         print("ERROR: NO FASTA FILE GIVEN")
 
 
+# *************************************************************************** #
+#                                                                             #
+#                          Locality Sensitive Hashing                         #
+#                                                                             #
+# *************************************************************************** #
 def createDocuments(reads):
     """
     Splits each read into two parts - left and right halfs - and creates
@@ -187,12 +200,13 @@ def shingling(docs, k):
     return shingles
 
 
-def minhashing(docs, shingles, n):
+def minhashing(docs, shingles, n, seed):
     """
     Create minhash signatures using the shingles
     """
     # Create n different permutations (hash functions) of the shingles
     hashfuncs = []
+    random.seed(seed)
     for i in xrange(n):
         h = range(len(shingles))
         random.shuffle(h)
@@ -256,11 +270,11 @@ def LSH(documents, bands, rows):
 
 
 
-#*****************************************************************************#
+# *************************************************************************** #
 #                                                                             #
-#                            Similarity checkers                              #
+#                             Similarity checkers                             #
 #                                                                             #
-#*****************************************************************************#
+# *************************************************************************** #
 def findSimilarPairs(band_buckets, t, totim, output, numReads, sim_measure):
     """
     Find candidate pairs that has a similarity above the threshold t
@@ -297,7 +311,8 @@ def findSimilarPairs(band_buckets, t, totim, output, numReads, sim_measure):
                                 bestMatches.append(bestMatch)
 
                                 if counter2 % 500000 == 0:
-                                    print "Processed", counter2, "pairs in", \
+                                    c = format(counter2, ',d').replace(",", ".")
+                                    print "Processed", c, "pairs in", \
                                         "time:", time.clock() - timer
                             else:
                                 print "Total time used (in secs):", \
@@ -313,30 +328,36 @@ def findSimilarPairs(band_buckets, t, totim, output, numReads, sim_measure):
                                 sys.exit()
 
     processing_time = time.clock() - timer
-    print "Processed", counter2, "pairs in time:", processing_time
-    print "{:,}".format(counter)
-    print "{:,}".format(counter2)
+    c = "{:,}".format(counter2).replace(",",".")
+    print "Processed", c, "pairs in time:", processing_time
+    print "{:,}".format(counter).replace(",",".")
+    print c
 
-    if sim_measure == "naive":
-        bestMatches.sort(key=itemgetter(0), reverse=False)
-    elif sim_measure == "jaccard":
-        bestMatches.sort()
+    # if sim_measure == "naive":
+    #     bestMatches.sort(key=itemgetter(0), reverse=False)
+    # elif sim_measure == "jaccard":
+    bestMatches.sort()
     
-    with open(output, 'w') as f:
-        maxNumPairs = numReads*(numReads-1)/2
-        f.write(str(numReads) + " " + str(maxNumPairs) + " " +
-                str(counter2) + " " + str(processing_time) + "\n")
-        counter = 0
-        for match in bestMatches:
-            if sim_measure == "naive":
-                f.write(str(counter) + " " + str(match[0]) + " " +
-                        str(match[1]) + " " + str(match[2]) + "\n")
-            elif sim_measure == "jaccard":
-                f.write(str(counter) + " " + str(match) + "\n")
-            counter += 1
+    # with open(output, 'w') as f:
+    #     maxNumPairs = numReads*(numReads-1)/2
+    #     f.write(str(numReads) + " " + str(maxNumPairs) + " " +
+    #             str(counter2) + " " + str(processing_time) + "\n")
+    #     counter = 0
+    #     for match in bestMatches:
+    #         if sim_measure == "naive":
+    #             f.write(str(counter) + " " + str(match[0]) + " " +
+    #                     str(match[1]) + " " + str(match[2]) + "\n")
+    #         elif sim_measure == "jaccard":
+    #             f.write(str(counter) + " " + str(match) + "\n")
+    #         f.write(str(counter) + " " + str(match) + "\n")
+    #         counter += 1
 
 
 def globalAlignment(doc1, doc2):
+    """
+    Aligning sequences by using a sliding window approach. 
+    Returns the best score (matches / seqlength) between the two sequences
+    """
     # dna1, dna2 = doc1.dna, doc2.dna
     # print doc1.dna
     # print len(doc1.dna)
@@ -368,6 +389,10 @@ def globalAlignment(doc1, doc2):
 
 
 def jaccardSim(doc1, doc2):
+    """
+    Computing the jaccard similarity.
+    Option to use jaccard bag similarity or standard jaccard similarity.
+    """
     ### Bag jaccard sim ###
     counterA = doc1.counterShingles
     counterB = doc2.counterShingles
@@ -447,8 +472,10 @@ def longest_common_substring(s1, s2):
     return s1[x_longest - longest: x_longest]
 
 
-# test_longest_common_substring
 def testLCS(doc1, doc2):
+    """
+    Test longest_common_substring method
+    """
     sig1 = ''.join(map(str, doc1.signature))
     sig2 = ''.join(map(str, doc2.signature))
     seq = longest_common_substring(sig1, sig2)
@@ -465,6 +492,9 @@ def testLCS(doc1, doc2):
 
 
 def NeedlemanWunsch(doc1, doc2):
+    """
+    Sequence alignment using the Needleman-Wunsch algorithm
+    """
     # scores
     match = 1
     mismatch = -1
@@ -506,7 +536,11 @@ def NeedlemanWunsch(doc1, doc2):
     # sys.exit(0)
 
 
-# NOT relevant method, just for playing around #
+# *************************************************************************** #
+#                                                                             #
+#                                Miscellaneous                                #
+#                                                                             #
+# *************************************************************************** #
 def bucketSize(band_buckets):
     count = 0
     for buckets in band_buckets:
@@ -527,7 +561,7 @@ def bucketSize(band_buckets):
         # 3640087
         # 3768266
 
-def compareAllPairs(reads, documents):
+def compareAllPairs(reads, documents, k):
     numReads = "{:,}".format(len(reads)).replace(",",".")
     print "Number of reads:", numReads
     print "Number of documents:", "{:,}".format(len(documents)).replace(",",".")
@@ -557,20 +591,22 @@ def compareAllPairs(reads, documents):
                           "of", strNumPairs, "pairs in time (minutes):", \
                           (time.clock() - timer) / 60
                     
-    # bestMatches.sort(key=itemgetter(0), reverse=False)
     # with open("all_pairs_naive.txt", 'w') as f:
     #     f.write(str(counter)+'\n')
     #     for match in bestMatches:
     #         f.write(str(match[0])+' '+str(match[1])+'\n')
 
-    bestMatches.sort(key=itemgetter(1), reverse=False)
-    with open("all_pairs_jaccard_normal_k_"+str(k)+".txt", 'w') as f:
+    with open("all_pairs_jaccard_standard_k_"+str(k)+".txt", 'w') as f:
         f.write(str(counter)+' '+str(numReads)+' '+str(time.clock()-timer)+'\n')
         for match in bestMatches:
             #f.write(str(match[0])+' '+str(match[1])+'\n')
             f.write(str(match)+'\n')
 
-
+# *************************************************************************** #
+#                                                                             #
+#                                     Main                                    #
+#                                                                             #
+# *************************************************************************** #
 def main():
     """
     Main method of the program
@@ -578,17 +614,18 @@ def main():
     totim = time.clock()
 
     # Parse command line options
-    fasta_file, k, n, threshold, bands, rows, sim_measure = optionParse()
+    fasta_file, k, threshold, bands, rows, sim_measure, seed = optionParse()
 
-    if not n:
-        n = bands*rows
+    # n (number of hash functions = length of minhash signatures) is implicitly
+    # given
+    n = bands * rows
 
-    if bands*rows != n:
-        print "ERROR: bands * rows do not equal n (number of hash functions)"
-        sys.exit(0)
+    if n % bands != 0:
+        print "ERROR: The number of bands and rows do not go into n"
+        sys.exit()
 
     # Read all reads from fasta file
-    reads = readData(fasta_file)            
+    reads = readData(fasta_file)
 
     documents = createDocuments(reads)
     # for doc in documents:
@@ -598,9 +635,10 @@ def main():
     # print shingles
     # print len(shingles)
 
-    #compareAllPairs(reads, documents)
+    #compareAllPairs(reads, documents, k)
 
-    minhashing(documents, shingles, n)
+    print "Seed:", seed
+    minhashing(documents, shingles, n, seed)
 
     band_buckets = LSH(documents, bands, rows)
 
@@ -614,7 +652,7 @@ def main():
     findSimilarPairs(band_buckets, threshold, totim, output, numReads,
                      sim_measure)
 
-    # bucketSize(band_buckets)
+    #bucketSize(band_buckets)
 
     print "Total time used (in secs):", time.clock() - totim
 
