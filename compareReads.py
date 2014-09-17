@@ -134,6 +134,8 @@ def readData(fasta_file):
     """
     if fasta_file:
         reads = []
+        skipped = 0
+        seqs = 0
         with open(fasta_file, "rU") as fasta_file:
             read = ""
             for line in fasta_file:
@@ -143,12 +145,21 @@ def readData(fasta_file):
                     if read != "":
                         reads.append(read)
                         read = ""
+                elif not line[:1] in ["A", "C", "G", "T"]:
+                    seqs += 1
+                    skipped += 1
                 # Concatenate multi-line sequences into one string
                 else:
+                    seqs += 1
                     read += line.strip().upper()
             # Append the last read in the file to the list
             if read != "":
                 reads.append(read)
+        if skipped > 0:
+            skipped = format(skipped, ',d')
+            seqs = format(lines, ',d')
+            print "Skipped", skipped, "of", seqs, "sequences in fasta file"
+            sys.exit()
         return reads
     else:
         print("ERROR: NO FASTA FILE GIVEN")
@@ -259,14 +270,16 @@ def LSH(documents, bands, rows):
         index += rows
         band_buckets.append(buckets)
 
-    # for bucket in buckets:
-    #     print "Bucket:", bucket
-    #     for document in buckets[bucket]:
-    #         print document.id,
-    #     print
-    #     for document in buckets[bucket]:
-    #         print document.signature,
-    #     print
+    # for buckets in band_buckets:
+    #     for bucket in buckets:
+    #         print "Bucket:", bucket
+    #         for document in buckets[bucket]:
+    #             print document.id,
+    #         print
+    #         for document in buckets[bucket]:
+    #             print document.dna,
+    #         print
+    # sys.exit()
 
     return band_buckets
 
@@ -355,7 +368,7 @@ def findSimilarPairs(band_buckets, t, totim, output, numReads, sim_measure):
     #         counter += 1
 
 
-def globalAlignment(doc1, doc2):
+def globalAlignment(doc1, doc2, extraInfo):
     """
     Aligning sequences by using a sliding window approach.
     Returns the best score (matches / seqlength) between the two sequences.
@@ -368,7 +381,10 @@ def globalAlignment(doc1, doc2):
     # print
 
     start = 0
-    bestScore = 0  # (0,0,0)
+    if extraInfo:
+        bestScore = (0,0,0)
+    else:
+        bestScore = 0
     seqLength = len(doc1.dna)-start
     while seqLength > 10 and bestScore != 1.0:  # and bestScore[0] != 1.0:
         # print seqLength, bestScore[1]
@@ -379,12 +395,14 @@ def globalAlignment(doc1, doc2):
                 matches += 1
         # print bestScore
         score = matches / float(seqLength)
-        if score > bestScore:  # bestScore[0]:
-            # print score, bestScore[0]
-            # print seqLength, matches, bestScore[1]
-            bestScore = score  # (score, matches, seqLength)
-        # if score > bestScore:
-        #     bestScore = score
+        if extraInfo:
+            if score > bestScore[0]:
+                # print score, bestScore[0]
+                # print seqLength, matches, bestScore[1]
+                bestScore = (score, matches, seqLength)
+        else:
+            if score > bestScore:
+                bestScore = score
         start += 1
         seqLength = len(doc1.dna)-start
     return bestScore
@@ -395,7 +413,7 @@ def jaccardSim(doc1, doc2):
     Computing the jaccard similarity.
     Option to use jaccard bag similarity or standard jaccard similarity.
     """
-    # ## Bag jaccard sim ###
+    # ## Bag jaccard sim ## #
     counterA = doc1.counterShingles
     counterB = doc2.counterShingles
     intersection = sum((counterA & counterB).values())
@@ -404,14 +422,14 @@ def jaccardSim(doc1, doc2):
     union = len(doc1.dna) + len(doc2.dna) - intersection
     return float(intersection) / union
 
-    # ## standard jaccard sim ###
+    # ## standard jaccard sim ## #
     # intersection = doc1.shingles.intersection(doc2.shingles)
     # if len(intersection) == 0:
     #     return 0
     # union = doc1.shingles.union(doc2.shingles)
     # return float(len(intersection)) / len(union)
 
-    # ## bp level jaccard sim - bag ###
+    # ## bp level jaccard sim - bag ## #
     # start = 0
     # bestScore = 0
     # seqLength = len(doc1.dna)-start
@@ -571,7 +589,7 @@ def compareAllPairs(reads, documents, k):
     numPairs = len(reads) * (len(reads)-1)
     strNumPairs = format(numPairs, ',d').replace(",", ".")
     print "Number of pairs to process:", strNumPairs
-    bestMatches = []
+    bestMatches = [[] for i in xrange(37)]
     counter = 0
     timer = time.clock()
     for i in xrange(0, len(documents)):
@@ -581,13 +599,14 @@ def compareAllPairs(reads, documents, k):
             if doc1.isLeft != doc2.isLeft and doc1.id != doc2.id:
                 counter += 1
                 if doc1.isLeft:
-                    # bestMatch_naive = globalAlignment(doc1, doc2)
+                    bestMatch_naive = globalAlignment(doc1, doc2, True)
                     bestMatch_jaccard = jaccardSim(doc1, doc2)
                 else:
-                    # bestMatch_naive = globalAlignment(doc2, doc1)
+                    bestMatch_naive = globalAlignment(doc2, doc1, True)
                     bestMatch_jaccard = jaccardSim(doc2, doc1)
-                # bestMatches.append((bestMatch_naive[0], bestMatch_jaccard))
-                bestMatches.append(bestMatch_jaccard)
+                bestMatches[bestMatch_naive[2]-1].append((bestMatch_naive[0],\
+                            bestMatch_jaccard))
+                #bestMatches.append(bestMatch_jaccard)
 
                 if counter % 200000 == 0:
                     print "Processed", format(counter, ',d').replace(",", "."),\
@@ -599,12 +618,19 @@ def compareAllPairs(reads, documents, k):
     #     for match in bestMatches:
     #         f.write(str(match[0])+' '+str(match[1])+'\n')
 
-    with open("all_pairs_jaccard_standard_k_"+str(k)+".txt", 'w') as f:
-        f.write(str(counter) + ' ' + str(numReads) + ' ' +
-                str(time.clock()-timer) + '\n')
-        for match in bestMatches:
-            # f.write(str(match[0])+' '+str(match[1])+'\n')
-            f.write(str(match)+'\n')
+    # with open("all_pairs_jaccard_standard_k_"+str(k)+".txt", 'w') as f:
+#         f.write(str(counter) + ' ' + str(numReads) + ' ' +
+#                 str(time.clock()-timer) + '\n')
+#         for match in bestMatches:
+#             # f.write(str(match[0])+' '+str(match[1])+'\n')
+#             f.write(str(match)+'\n')
+
+    for i in xrange(11,len(bestMatches)):
+            with open("all_pairs_naive_jaccard_bag_seqLength" + str(i+1) +".txt", 'w') as f:
+                f.write(str(counter) + ' ' + str(numReads) + ' ' +
+                        str(time.clock()-timer) + '\n')
+                for match in bestMatches[i]:
+                    f.write(str(match[0])+' '+str(match[1])+'\n')
 
 
 # *************************************************************************** #
@@ -640,7 +666,8 @@ def main():
     # print shingles
     # print len(shingles)
 
-    # compareAllPairs(reads, documents, k)
+    compareAllPairs(reads, documents, k)
+    sys.exit()
 
     print "Seed:", seed
     minhashing(documents, shingles, n, seed)
