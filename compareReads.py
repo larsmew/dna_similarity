@@ -34,7 +34,7 @@ class Document(object):
     id = 0
     isLeft = False  # If document comes from the left or right part of a read
     shingles = set()
-    counterShingles = None
+    # counterShingles = None
     signature = []
     similarTo = set()
 
@@ -136,7 +136,6 @@ def readDataOld(fasta_file):
         print "Processing fasta file..."
         tim = time.clock()
         reads = []
-        skipped = 0
         seqs = 0
         with open(fasta_file, "rU") as fasta_file:
             read = ""
@@ -161,6 +160,7 @@ def readDataOld(fasta_file):
     else:
         print("ERROR: NO FASTA FILE GIVEN")
 
+
 def readData(fasta_file):
     """
     Extract the reads (DNA sequences) from the given fasta file
@@ -169,7 +169,6 @@ def readData(fasta_file):
         print "Processing fasta file..."
         tim = time.clock()
         documents = []
-        skipped = 0
         seqs = 0
         id = 1
         with open(fasta_file, "rU") as fasta_file:
@@ -182,10 +181,12 @@ def readData(fasta_file):
                         # Splits the string into two parts
                         leftpart = read[:len(read)/2]
                         rightpart = read[len(read)/2:]
-                        # Creates a document object for the left part of the read
+                        # Creates a document object for the left part of the
+                        # read
                         documents.append(createDocument(leftpart, id, True))
                         id += 1
-                        # Creates a document object for the right part of the read
+                        # Creates a document object for the right part of the
+                        # read
                         documents.append(createDocument(rightpart, id, False))
                         id += 1
                         read = ""
@@ -205,12 +206,12 @@ def readData(fasta_file):
                 documents.append(createDocument(rightpart, id, False))
                 seqs += 1
 
-        print "Read", format(seqs, ',d'), "sequences in time:", \
+        print "Read", format(seqs, ',d'), "sequences in", \
               (time.clock() - tim) / 60, "minutes"
         return documents
     else:
         print("ERROR: NO FASTA FILE GIVEN")
-
+        sys.exit()
 
 
 # *************************************************************************** #
@@ -259,9 +260,9 @@ def shinglingOld(docs, k):
             shingles.add(shingle)
             # Add it to the set of shingles of the current document
             docShingles.add(shingle)
-            counterShingles.append(shingle)
+            # counterShingles.append(shingle)
 
-        doc.counterShingles = Counter(counterShingles)
+        # doc.counterShingles = Counter(counterShingles)
         # Store the document's shingles in the document object
         doc.shingles = docShingles
 
@@ -286,7 +287,7 @@ def shingling(docs, k):
     tim = time.clock()
     print "Shingling..."
     shingles = set()  # Contains all k-shingles in the dataset
-    #shinglesDict = dict()
+    # shinglesDict = dict()
     for doc in docs:
         for i in xrange(len(doc.dna)-k+1):
             # create k-shingle (substring) from the document
@@ -307,7 +308,7 @@ def minhashing(docs, shingles, n, k, seed):
     """
     tim = time.clock()
     print "Minhashing..."
-    #shingles = [shingle for shingle in shinglesDict]
+    # shingles = [shingle for shingle in shinglesDict]
 
     # Create n different permutations (hash functions) of the shingles
     hashfuncs = []
@@ -323,26 +324,74 @@ def minhashing(docs, shingles, n, k, seed):
     # Find signature for each document
     count = 0
     for doc in docs:
-        count +=1
+        count += 1
+        docShingles = getDocShingles(doc, k)
+        signature = [None for i in xrange(n)]
+        # For each row in the 'character matrix'
+        occupied = 0
+        for r in xrange(len(shingles)):
+            # If the shingle is in the document, then
+            if occupied == len(signature):
+                # print sum(signature)
+                break
+            for i in xrange(n):
+                if signature[i] is None:
+                    if shingles[hashfuncs[i][r]] in docShingles:
+                        signature[i] = r
+                        occupied += 1
+        doc.signature = signature
+        # print signature
+        if count % 100000 == 0:
+            print "Processed", count, "documents"
+
+    print "Finished minhashing in", (time.clock() - tim) / 60, "minutes"
+
+
+def minhashingOld(docs, shingles, n, k, seed):
+    """
+    Create minhash signatures using the shingles
+    """
+    tim = time.clock()
+    print "Minhashing..."
+    # shingles = [shingle for shingle in shinglesDict]
+
+    # Create n different permutations (hash functions) of the shingles
+    hashfuncs = []
+    random.seed(seed)
+    for i in xrange(n):
+        h = range(len(shingles))
+        random.shuffle(h)
+        hashfuncs.append(h)
+        # print h,"\n"
+
+    # Create minhash signatures as described in chapter 3 of the book Massive
+    # Data Mining
+    # Find signature for each document
+    count = 0
+    for doc in docs:
+        count += 1
         docShingles = getDocShingles(doc, k)
         signature = [None for i in xrange(n)]
         # For each row in the 'character matrix'
         for r in xrange(len(shingles)):
             # If the shingle is in the document, then
-            #if doc.id in shinglesDict[shingles[r]]:
+            # if doc.id in shinglesDict[shingles[r]]:
             if shingles[r] in docShingles:
                 # Find the 'first' shingle relative to each permutation
                 for i in xrange(n):
                     if signature[i] is None or signature[i] > hashfuncs[i][r]:
                         signature[i] = hashfuncs[i][r]
+        # print sum(signature)
         doc.signature = signature
         # print signature
         if count % 100000 == 0:
             print "Processed", count, "documents"
+
+
     print "Finished minhashing in", (time.clock() - tim) / 60, "minutes"
 
 
-def minhashingOld(docs, shingles, n, seed):
+def minhashingOld_MemHungry(docs, shingles, n, seed):
     """
     Create minhash signatures using the shingles
     """
@@ -382,8 +431,6 @@ def LSH(documents, bands, rows):
     """
     tim = time.clock()
     print "Running LSH..."
-    band_buckets = []
-    # buckets = dict([])
     index = 0
     for b in xrange(bands):
         # For each band, create a bucket array with signature as key
@@ -399,14 +446,64 @@ def LSH(documents, bands, rows):
             else:
                 buckets[key] = [doc]
         index += rows
-        print "Number of buckets in band:", len(buckets)
-        band_buckets.append(buckets)
 
-    for buckets in band_buckets:
+        for bucket in buckets:
+            for i in xrange(len(buckets[bucket])):
+                pairs = set()
+                doc1 = buckets[bucket][i]
+                for j in xrange(i+1, len(buckets[bucket])):
+                    doc2 = buckets[bucket][j]
+                    if doc1.isLeft != doc2.isLeft:
+                        pairs.add(doc2)
+                doc1.similarTo = doc1.similarTo.union(pairs)
+
+        print "Number of buckets in band", b+1, ":", len(buckets)
         numPairs = 0
         for bucket in buckets:
-            numPairs += len(bucket) * (len(bucket)-1) / 2
-        print "Number of candidate pairs in band:", numPairs
+            inBucket = buckets[bucket]
+            numPairs += len(inBucket) * (len(inBucket)-1) / 2
+        print "Number of candidate pairs in band", b+1, ":", numPairs
+
+    count = 0
+    for doc in documents:
+        count += len(doc.similarTo)
+    print "Number of unique candidate pairs", count
+
+    print "Finished LSH in", (time.clock() - tim) / 60, "minutes"
+    return None
+
+def LSH_Old(documents, bands, rows):
+    """
+    Use Locality-Sensitive Hashing (LSH) with the banding technique to
+    hash similar elements to the same buckets.
+    """
+    tim = time.clock()
+    print "Running LSH..."
+    band_buckets = []
+    index = 0
+    for b in xrange(bands):
+        # For each band, create a bucket array with signature as key
+        buckets = dict([])
+        for doc in documents:
+            # Obtain sub-signature of length rows
+            col = doc.signature[index:index+rows]
+            # Convert to string
+            key = ''.join(map(str, col))
+            # Place the document in a bucket
+            if key in buckets:
+                buckets[key].append(doc)
+            else:
+                buckets[key] = [doc]
+        index += rows
+        band_buckets.append(buckets)
+
+    for buckets in enumerate(band_buckets):
+        print "Number of buckets in band", buckets[0]+1, ":", len(buckets[1])
+        numPairs = 0
+        for bucket in buckets[1]:
+            inBucket = buckets[1][bucket]
+            numPairs += len(inBucket) * (len(inBucket)-1) / 2
+        print "Number of candidate pairs in band", buckets[0]+1, ":", numPairs
 
     # for buckets in band_buckets:
     #     for bucket in buckets:
@@ -419,6 +516,23 @@ def LSH(documents, bands, rows):
     #         print
     # sys.exit()
 
+    for buckets in band_buckets:
+        for bucket in buckets:
+            for i in xrange(len(buckets[bucket])):
+                pairs = set()
+                doc1 = buckets[bucket][i]
+                for j in xrange(i+1, len(buckets[bucket])):
+                    doc2 = buckets[bucket][j]
+                    if doc1.isLeft != doc2.isLeft: # and doc1.id != doc2.id:
+                        pairs.add(doc2)
+                doc1.similarTo = doc1.similarTo.union(pairs)
+
+    count = 0
+    for doc in documents:
+        #print [i.id for i in doc.similarTo]
+        count += len(doc.similarTo)
+    print "Number of unique candidate pairs", count
+
     print "Finished LSH in", (time.clock() - tim) / 60, "minutes"
     return band_buckets
 
@@ -428,14 +542,63 @@ def LSH(documents, bands, rows):
 #                             Similarity checkers                             #
 #                                                                             #
 # *************************************************************************** #
-def findSimilarPairs(band_buckets, t, totim, output, numReads, sim_measure):
+def findSimilarPairs(documents, t, k, totim, numReads, sim_measure):
+    """
+    Find candidate pairs that has a similarity above the threshold t
+    """
+    counter = 0
+    timer = time.clock()
+    bestMatches1 = []
+    bestMatches2 = []
+    for doc1 in documents:
+        for doc2 in doc1.similarTo:
+            counter += 1
+            if doc1.isLeft:
+                bestMatch1 = globalAlignment(doc1, doc2, True)
+                bestMatch2 = jaccardSim(doc1, doc2, k)
+            else:
+                bestMatch1 = globalAlignment(doc2, doc1, True)
+                bestMatch2 = jaccardSim(doc2, doc1, k)
+            bestMatches1.append(bestMatch1)
+            bestMatches2.append(bestMatch2)
+
+    processing_time = time.clock() - timer
+    c = "{:,}".format(counter).replace(",", ".")
+    print "Processed", c, "pairs in time:", processing_time
+
+    maxNumPairs = numReads * (numReads-1)
+    with open("naive_vs_jaccard_standard_NA19240_2.txt", 'w') as f:
+        f.write(str(numReads) + " " + str(maxNumPairs) + " " +
+                str(counter) + " " + str(processing_time) + "\n")
+        for idx, match1 in enumerate(bestMatches1):
+            f.write(str(match1[0]) + " " + str(bestMatches2[idx]) + "\n")
+
+    bestMatches1.sort(key=itemgetter(0), reverse=False)
+    with open("naive_NA19240_2.txt", 'w') as f:
+        f.write(str(numReads) + " " + str(maxNumPairs) + " " +
+                str(counter) + " " + str(processing_time) + "\n")
+        for idx, match1 in enumerate(bestMatches1):
+            f.write(str(idx) + " " + str(match1[0]) + " " +
+                    str(match1[1]) + " " + str(match1[2]) + "\n")
+
+    bestMatches2.sort()
+    with open("standard_jaccard_NA19240_2.txt", 'w') as f:
+        f.write(str(numReads) + " " + str(maxNumPairs) + " " +
+                str(counter) + " " + str(processing_time) + "\n")
+        for idx, match in enumerate(bestMatches2):
+            f.write(str(idx) + " " + str(match) + "\n")
+
+
+def findSimilarPairsOld(band_buckets, t, k, totim, output, numReads,
+                        sim_measure, writeToFile=False):
     """
     Find candidate pairs that has a similarity above the threshold t
     """
     counter = 0
     counter2 = 0
     timer = time.clock()
-    bestMatches = []
+    bestMatches1 = []
+    bestMatches2 = []
     for buckets in band_buckets:
         for bucket in buckets:
             if len(buckets[bucket]) > 1:
@@ -451,25 +614,26 @@ def findSimilarPairs(band_buckets, t, totim, output, numReads, sim_measure):
                                 # testLCS(doc1, doc2)
                                 # NeedlemanWunsch(doc1, doc2)
                                 if doc1.isLeft:
-                                    # bestMatch1 = globalAlignment(doc1, doc2)
-                                    # bestMatch2 = jaccardSim(doc1, doc2)
-                                    if sim_measure == "naive":
-                                        bestMatch = globalAlignment(doc1, doc2,
-                                                                    True)
-                                    elif sim_measure == "jaccard":
-                                        bestMatch = jaccardSim(doc1, doc2)
+                                    bestMatch1 = globalAlignment(doc1, doc2, True)
+                                    bestMatch2 = jaccardSim(doc1, doc2, k)
+                                    # if sim_measure == "naive":
+                                    #     bestMatch = globalAlignment(doc1, doc2,
+                                    #                                 True)
+                                    # elif sim_measure == "jaccard":
+                                    #     bestMatch = jaccardSim(doc1, doc2)
                                 else:
-                                    # bestMatch1 = globalAlignment(doc2, doc1)
-                                    # bestMatch2 = jaccardSim(doc2, doc1)
-                                    if sim_measure == "naive":
-                                        bestMatch = globalAlignment(doc2, doc1,
-                                                                    True)
-                                    elif sim_measure == "jaccard":
-                                        bestMatch = jaccardSim(doc2, doc1)
+                                    bestMatch1 = globalAlignment(doc2, doc1, True)
+                                    bestMatch2 = jaccardSim(doc2, doc1, k)
+                                    # if sim_measure == "naive":
+                                    #     bestMatch = globalAlignment(doc2, doc1,
+                                    #                                 True)
+                                    # elif sim_measure == "jaccard":
+                                    #     bestMatch = jaccardSim(doc2, doc1)
 
-                                #bestMatches.append((bestMatch1, bestMatch2,
-                                #                    doc1, doc2))
-                                bestMatches.append(bestMatch)
+                                # bestMatches.append((bestMatch1, bestMatch2,
+                                #                     doc1, doc2))
+                                bestMatches1.append(bestMatch1)
+                                bestMatches2.append(bestMatch2)
 
                                 if counter2 % 500000 == 0:
                                     print "Processed", format(counter2, ',d') \
@@ -493,6 +657,28 @@ def findSimilarPairs(band_buckets, t, totim, output, numReads, sim_measure):
     print "Processed", c, "pairs in time:", processing_time
     print "{:,}".format(counter).replace(",", ".")
     print c
+    #
+    # maxNumPairs = numReads * (numReads-1)
+    # with open("naive_vs_jaccard_standard_NA19240.txt", 'w') as f:
+    #     f.write(str(numReads) + " " + str(maxNumPairs) + " " +
+    #             str(counter2) + " " + str(processing_time) + "\n")
+    #     for idx, match1 in enumerate(bestMatches1):
+    #         f.write(str(match1[0]) + " " + str(bestMatches2[idx]) + "\n")
+    #
+    # bestMatches1.sort(key=itemgetter(0), reverse=False)
+    # with open("naive_NA19240.txt", 'w') as f:
+    #     f.write(str(numReads) + " " + str(maxNumPairs) + " " +
+    #             str(counter2) + " " + str(processing_time) + "\n")
+    #     for idx, match1 in enumerate(bestMatches1):
+    #         f.write(str(idx) + " " + str(match1[0]) + " " +
+    #                 str(match1[1]) + " " + str(match1[2]) + "\n")
+    #
+    # bestMatches2.sort()
+    # with open("standard_jaccard_NA19240.txt", 'w') as f:
+    #     f.write(str(numReads) + " " + str(maxNumPairs) + " " +
+    #             str(counter2) + " " + str(processing_time) + "\n")
+    #     for idx, match in enumerate(bestMatches2):
+    #         f.write(str(idx) + " " + str(match) + "\n")
 
     # with open("output.txt", 'w') as f:
     #     for match in bestMatches:
@@ -501,7 +687,7 @@ def findSimilarPairs(band_buckets, t, totim, output, numReads, sim_measure):
     #             f.write(str(match[2].dna)+"\n")
     #             f.write(str(match[3].dna)+"\n")
 
-    if output:
+    if writeToFile:
         if sim_measure == "naive":
             bestMatches.sort(key=itemgetter(0), reverse=False)
         elif sim_measure == "jaccard":
@@ -535,11 +721,11 @@ def globalAlignment(doc1, doc2, extraInfo=False):
 
     start = 0
     if extraInfo:
-        bestScore = (0,0,0)
+        bestScore = (0, 0, 0)
     else:
         bestScore = 0
     seqLength = len(doc1.dna)-start
-    while seqLength > 10:
+    while seqLength > 24:
         # print seqLength, bestScore[1]
         matches = 0
         for i in xrange(seqLength):
@@ -565,13 +751,13 @@ def globalAlignment(doc1, doc2, extraInfo=False):
     return bestScore
 
 
-def jaccardSim(doc1, doc2, sim_measure="standard"):
+def jaccardSim(doc1, doc2, k, sim_measure="standard"):
     """
     Computing the jaccard similarity.
     Option to use jaccard bag similarity or standard jaccard similarity.
     """
+    # ## Bag jaccard sim ## #
     if sim_measure == "bag":
-        # ## Bag jaccard sim ## #
         counterA = doc1.counterShingles
         counterB = doc2.counterShingles
         intersection = sum((counterA & counterB).values())
@@ -580,12 +766,14 @@ def jaccardSim(doc1, doc2, sim_measure="standard"):
         union = len(doc1.dna) + len(doc2.dna) - intersection
         return float(intersection) / union
 
+    # ## standard jaccard sim ## #
     if sim_measure == "standard":
-        # ## standard jaccard sim ## #
-        intersection = doc1.shingles.intersection(doc2.shingles)
+        shingles1 = getDocShingles(doc1, k)
+        shingles2 = getDocShingles(doc2, k)
+        intersection = shingles1.intersection(shingles2)
         if len(intersection) == 0:
             return 0
-        union = doc1.shingles.union(doc2.shingles)
+        union = shingles1.union(shingles2)
         return float(len(intersection)) / len(union)
 
     # ## bp level jaccard sim - bag ## #
@@ -763,11 +951,13 @@ def compareAllPairs(documents, k, sim_measure):
                 else:
                     bestMatch_naive = globalAlignment(doc2, doc1, True)
                     bestMatch_jaccard = jaccardSim(doc2, doc1, sim_measure)
-                bestMatches[bestMatch_naive[2]-1].append((bestMatch_naive[0],\
-                           bestMatch_jaccard))
-                #bestMatches.append(bestMatch_jaccard)
 
-                # if bestMatch_naive[2] > 35 and bestMatch_jaccard > 0.4 and bestMatch_jaccard < 0.8 and bestMatch_naive[0] > 0.8:
+                bestMatches[bestMatch_naive[2]-1].append((bestMatch_naive[0],
+                                                          bestMatch_jaccard))
+                # bestMatches.append(bestMatch_jaccard)
+
+                # if bestMatch_naive[2] > 35 and bestMatch_jaccard > 0.4 and \
+                #    bestMatch_jaccard < 0.8 and bestMatch_naive[0] > 0.8:
                 #     print bestMatch_naive[0], bestMatch_jaccard
                 #     print bestMatch_naive[1]
                 #     print bestMatch_naive[2]
@@ -793,7 +983,7 @@ def compareAllPairs(documents, k, sim_measure):
     #         # f.write(str(match[0])+' '+str(match[1])+'\n')
     #         f.write(str(match)+'\n')
 
-    for i in xrange(10,len(bestMatches)):
+    for i in xrange(10, len(bestMatches)):
             with open("all_pairs_naive_jaccard_" + sim_measure + "_seqLength" +
                       str(i+1) + ".txt", 'w') as f:
                 f.write(str(counter) + ' ' + str(numReads) + ' ' +
@@ -832,7 +1022,7 @@ def main():
     #     print doc.dna, doc.id, doc.isLeft
 
     shingles = shingling(documents, k)
-    #shingles2 = list(shinglingOld(documents, k))
+    # shingles = list(shinglingOld(documents, k))
     # print shingles
     # print len(shingles)
 
@@ -841,19 +1031,22 @@ def main():
 
     print "Seed:", seed
     minhashing(documents, shingles, n, k, seed)
-    #minhashingOld(documents, shingles2, n, seed)
+    # minhashingOld(documents, shingles2, n, seed)
 
-    band_buckets = LSH(documents, bands, rows)
+    # band_buckets = LSH_Old(documents, bands, rows)
+    LSH(documents, bands, rows)
+    # LSH_Old(documents, bands, rows)
 
-    print "Time used for LSH:", (time.clock() - totim) / 60, "minutes"
-    #sys.exit()
-
+    print "Total time used for LSH:", (time.clock() - totim) / 60, "minutes"
+    sys.exit()
 
     output_path = ("output_"+sim_measure+"/output_k_" + str(k) + "_b_" +
                    str(bands) + "_r_" + str(rows) + "/")
     output_file = "output_k_"+str(k)+"_b_"+str(bands)+"_r_"+str(rows)+".txt"
     output = output_path + output_file
-    findSimilarPairs(band_buckets, threshold, totim, output, len(documents)/2,
+    # findSimilarPairsOld(band_buckets, threshold, k, totim, output,
+    #                 len(documents)/2, sim_measure)
+    findSimilarPairs(documents, threshold, k, output, len(documents)/2,
                      sim_measure)
 
     # bucketSize(band_buckets)
