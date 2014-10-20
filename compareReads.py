@@ -147,39 +147,6 @@ def memory_usage_resource():
     return mem
 
 
-def readDataOld(fasta_file):
-    """
-    Extract the reads (DNA sequences) from the given fasta file
-    """
-    if fasta_file:
-        print "Processing fasta file..."
-        tim = time.clock()
-        reads = []
-        seqs = 0
-        with open(fasta_file, "rU") as fasta_file:
-            read = ""
-            for line in fasta_file:
-                # If line starts with ">", which indicates end of a sequence
-                # Then, append it to list of reads
-                if line.startswith(">"):
-                    if read != "":
-                        reads.append(read)
-                        read = ""
-                # Concatenate multi-line sequences into one string
-                else:
-                    seqs += 1
-                    read += line.strip().upper()
-            # Append the last read in the file to the list
-            if read != "":
-                reads.append(read)
-
-        print "Read", format(seqs, ',d'), "sequences in time:", \
-              (time.clock() - tim) / 60, "minutes"
-        return reads
-    else:
-        print("ERROR: NO FASTA FILE GIVEN")
-
-
 def readData(fasta_file, log):
     """
     Extract the reads (DNA sequences) from the given fasta file
@@ -243,60 +210,6 @@ def readData(fasta_file, log):
 #                          Locality Sensitive Hashing                         #
 #                                                                             #
 # *************************************************************************** #
-def createDocuments(reads):
-    """
-    Splits each read into two parts - left and right halfs - and creates
-    the document objects.
-    """
-    tim = time.clock()
-    print "Creating documents..."
-    id = 1  # Uses id system for bookkeeping
-    documents = []
-    for read in reads:
-        # Splits the string into two parts
-        leftpart, rightpart = read[:len(read)/2], read[len(read)/2:]
-        # Creates a document object for the left part of the read
-        documents.append(createDocument(leftpart, id, True))
-        # Creates a document object for the right part of the read
-        documents.append(createDocument(rightpart, id, False))
-        id += 1
-    print "Created documents in", (time.clock() - tim) / 60, "minutes"
-    return documents
-
-
-# Obsolete - faster, but too high memory requirements
-def shinglingOld(docs, k):
-    """
-    Create k-shingles (substrings of length k) from each document
-    """
-    tim = time.clock()
-    print "Shingling..."
-    shingles = set()  # Contains all k-shingles in the dataset
-    count = 0
-    for doc in docs:
-        count += 1
-        docShingles = set()  # Contains the k-shingles in the given document
-        counterShingles = []
-        for i in xrange(len(doc.dna)-k+1):
-            # create k-shingle (substring) from the document
-            shingle = doc.dna[i:i+k]
-            # Add it to the set of all shingles
-            shingles.add(shingle)
-            # Add it to the set of shingles of the current document
-            docShingles.add(shingle)
-            # counterShingles.append(shingle)
-
-        # doc.counterShingles = Counter(counterShingles)
-        # Store the document's shingles in the document object
-        doc.shingles = docShingles
-
-        # print docShingles,"\n"
-        if count % 500000 == 0:
-            print "Processed", count, "of 27.057.600 documents"
-    print "Finished shingling in", (time.clock() - tim) / 60, "minutes"
-    return shingles
-
-
 def getDocShingles(doc, k):
     shingles = set()
     for i in xrange(len(doc.dna)-k+1):
@@ -416,39 +329,6 @@ def minhashingOld(docs, shingles, n, k, seed, log):
     print "Finished minhashing in", (time.clock() - tim) / 60, "minutes"
 
 
-def minhashingOld_MemHungry(docs, shingles, n, seed):
-    """
-    Create minhash signatures using the shingles
-    """
-    tim = time.clock()
-    print "Minhashing..."
-    # Create n different permutations (hash functions) of the shingles
-    hashfuncs = []
-    random.seed(seed)
-    for i in xrange(n):
-        h = range(len(shingles))
-        random.shuffle(h)
-        hashfuncs.append(h)
-        # print h,"\n"
-
-    # Create minhash signatures as described in chapter 3 of the book Massive
-    # Data Mining
-    # Find signature for each document
-    for doc in docs:
-        signature = [None for i in xrange(n)]
-        # For each row in the 'character matrix'
-        for r in xrange(len(shingles)):
-            # If the shingle is in the document, then
-            if shingles[r] in doc.shingles:
-                # Find the 'first' shingle relative to each permutation
-                for i in xrange(n):
-                    if signature[i] is None or signature[i] > hashfuncs[i][r]:
-                        signature[i] = hashfuncs[i][r]
-        doc.signature = signature
-        # print signature
-    print "Finished minhashing in", (time.clock() - tim) / 60, "minutes"
-
-
 def LSH(documents, bands, rows, log):
     """
     Use Locality-Sensitive Hashing (LSH) with the banding technique to
@@ -500,70 +380,6 @@ def LSH(documents, bands, rows, log):
 
     print "Finished LSH in", (time.clock() - tim) / 60, "minutes"
     return None
-
-def LSH_Old(documents, bands, rows):
-    """
-    Use Locality-Sensitive Hashing (LSH) with the banding technique to
-    hash similar elements to the same buckets.
-    """
-    tim = time.clock()
-    print "Running LSH..."
-    band_buckets = []
-    index = 0
-    for b in xrange(bands):
-        # For each band, create a bucket array with signature as key
-        buckets = dict([])
-        for doc in documents:
-            # Obtain sub-signature of length rows
-            col = doc.signature[index:index+rows]
-            # Convert to string
-            key = ''.join(map(str, col))
-            # Place the document in a bucket
-            if key in buckets:
-                buckets[key].append(doc)
-            else:
-                buckets[key] = [doc]
-        index += rows
-        band_buckets.append(buckets)
-
-    for buckets in enumerate(band_buckets):
-        print "Number of buckets in band", buckets[0]+1, ":", len(buckets[1])
-        numPairs = 0
-        for bucket in buckets[1]:
-            inBucket = buckets[1][bucket]
-            numPairs += len(inBucket) * (len(inBucket)-1) / 2
-        print "Number of candidate pairs in band", buckets[0]+1, ":", numPairs
-
-    # for buckets in band_buckets:
-    #     for bucket in buckets:
-    #         print "Bucket:", bucket
-    #         for document in buckets[bucket]:
-    #             print document.id,
-    #         print
-    #         for document in buckets[bucket]:
-    #             print document.dna,
-    #         print
-    # sys.exit()
-
-    for buckets in band_buckets:
-        for bucket in buckets:
-            for i in xrange(len(buckets[bucket])):
-                pairs = set()
-                doc1 = buckets[bucket][i]
-                for j in xrange(i+1, len(buckets[bucket])):
-                    doc2 = buckets[bucket][j]
-                    if doc1.isLeft != doc2.isLeft: # and doc1.id != doc2.id:
-                        pairs.add(doc2)
-                doc1.similarTo = doc1.similarTo.union(pairs)
-
-    count = 0
-    for doc in documents:
-        #print [i.id for i in doc.similarTo]
-        count += len(doc.similarTo)
-    print "Number of unique candidate pairs", count
-
-    print "Finished LSH in", (time.clock() - tim) / 60, "minutes"
-    return band_buckets
 
 
 # *************************************************************************** #
