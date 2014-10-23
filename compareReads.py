@@ -20,6 +20,167 @@ import random
 # import nwalign as nw
 
 
+def read_data_seq(fasta_file):
+    with open(fasta_file, "rU") as fasta_file:
+        read = ""
+        tim = time.clock()
+        print "Fasta file..."
+        reads = []
+        for line in fasta_file:
+            # If line starts with ">", which indicates end of a sequence, append it to list of reads
+            if line.startswith(">"):
+                if read != "":
+                    # Splits the string into two parts
+                    leftpart = read[:len(read)/2]
+                    rightpart = read[len(read)/2:]
+                    reads.append(leftpart)
+                    reads.append(rightpart)
+                    read = ""
+            # Concatenate multi-line sequences into one string
+            else:
+                read += line.strip().upper()
+
+        print "Finished minhashing in", (time.clock() - tim) / 60, "minutes"
+        print "Memory usage (in mb):", memory_usage_resource()
+
+def LSH_run(fasta_file, bands, rows, n, k, seed):
+    if fasta_file:
+        tim = time.clock()
+        shingles = getAllShingles(fasta_file, k)
+
+        random.seed(seed)
+        for b in xrange(bands):
+            buckets = dict()
+            hashfuncs = computeHashes(rows, shingles)
+            idx = read_minhash(fasta_file, shingles, buckets, k, rows,
+                               seed, hashfuncs)
+            LSH_band(buckets, b)
+
+        print "Finished LSH in", (time.clock() - tim) / 60, "minutes"
+        print "Memory usage (in mb):", memory_usage_resource()
+
+    else:
+        print("ERROR: NO FASTA FILE GIVEN")
+        sys.exit()
+
+def computeHashes(rows, shingles):
+    # Create n different permutations (hash functions) of the shingles
+    hashfuncs = []
+    for i in xrange(rows):
+        h = range(len(shingles))
+        random.shuffle(h)
+        hashfuncs.append(h)
+        # print h,"\n"
+    print "Computed hashfunctions"
+
+
+def getAllShingles(fasta_file, k):
+    print "Shingling..."
+    tim = time.clock()
+    with open(fasta_file, "rU") as fasta_file:
+        shingles = set()
+        read = ""
+        for line in fasta_file:
+            # If line starts with ">", which indicates end of a sequence
+            # Then, append it to list of reads
+            if line.startswith(">"):
+                if read != "":
+                    # Splits the string into two parts
+                    leftpart = read[:len(read)/2]
+                    for shingle in getDocShingles(leftpart, k):
+                        shingles.add(shingle)
+                    rightpart = read[len(read)/2:]
+                    for shingle in getDocShingles(rightpart, k):
+                        shingles.add(shingle)
+                    read = ""
+            # Concatenate multi-line sequences into one string
+            else:
+                read += line.strip().upper()
+        print "Finished shingling in", (time.clock() - tim) / 60, "minutes"
+        print "Number of shingles:", len(shingles)
+        print "Memory usage (in mb):", memory_usage_resource()
+        return list(shingles)
+
+
+def read_minhash(fasta_file, shingles, buckets, k, rows, seed, hashfuncs):
+    with open(fasta_file, "rU") as fasta_file:
+        read = ""
+        tim = time.clock()
+        print "Minhashing..."
+        idx = 0
+        for line in fasta_file:
+            # If line starts with ">", which indicates end of a sequence, append it to list of reads
+            if line.startswith(">"):
+                if read != "":
+                    # Splits the string into two parts
+                    leftpart = read[:len(read)/2]
+                    minhashing_run(leftpart, idx, shingles, buckets,
+                                   k, rows, seed, hashfuncs)
+                    idx += 1
+                    rightpart = read[len(read)/2:]
+                    minhashing_run(rightpart, idx, shingles, buckets,
+                                   k, rows, seed, hashfuncs)
+                    idx += 1
+                    read = ""
+                if idx % 1000 == 0:
+                    print "Processed", idx, "documents in", \
+                          (time.clock() - tim) / 60, "minutes"
+            # Concatenate multi-line sequences into one string
+            else:
+                read += line.strip().upper()
+
+        print "Finished minhashing in", (time.clock() - tim) / 60,\
+              "minutes"
+        print "Memory usage (in mb):", memory_usage_resource()
+
+
+def minhashing_run(dna, idx, shingles, buckets, k, rows, seed, hashfuncs):
+    """
+    Create minhash signatures using the shingles
+    """
+    # Create minhash signatures as described in chapter 3 of the book Massive
+    # Data Mining
+    # Find signature for each document
+    docShingles = getDocShingles(dna, k)
+    signature = [None for i in xrange(rows)]
+    # For each row in the 'character matrix'
+    for r in xrange(len(shingles)):
+        # If the shingle is in the document, then
+        # if doc.id in shinglesDict[shingles[r]]:
+        if shingles[r] in docShingles:
+            # Find the 'first' shingle relative to each permutation
+            for i in xrange(rows):
+                if signature[i] is None or signature[i] > hashfuncs[i][r]:
+                    signature[i] = hashfuncs[i][r]
+
+    key = int(''.join(map(str, signature)))
+    if key in buckets:
+        buckets[key].append(idx)
+    else:
+        buckets[key] = [idx]
+
+
+def LSH_band(buckets, b):
+    tim = time.clock()
+    print "Running LSH..."
+    numPairs = 0
+    for bucket in buckets:
+        for i in xrange(len(buckets[bucket])):
+            id1 = buckets[bucket][i]
+            for j in xrange(i+1, len(buckets[bucket])):
+                id2 = buckets[bucket][j]
+                if (id1 - id2) % 2 == 0:
+                    if id1 + 1 != id2 and id1 != id2 + 1:
+                        #doc1.similarTo.add(doc2)
+                        numPairs += 1
+
+    print "Number of buckets in band", b+1, ":", len(buckets)
+    print "Number of candidate pairs in band", b+1, ":", numPairs
+
+    print "Finished LSH for band", b+1, "in", (time.clock() - tim) / 60, \
+          "minutes"
+
+
 # *************************************************************************** #
 #                                                                             #
 #                                Data structure                               #
@@ -37,23 +198,20 @@ class Document(object):
     # counterShingles = None
     signature = []
     similarTo = set()
-    emptyInSig = 0
 
     # Initializer
-    def __init__(self, dna, id, isLeft, n):
+    def __init__(self, dna, id, isLeft):
         self.dna = dna
         self.id = id
         self.isLeft = isLeft
         self.similarTo = set()
-        self.signature = [None for i in xrange(n)]
-        self.emptyInSig = n
 
 
-def createDocument(dna, id, isLeft, n):
+def createDocument(dna, id, isLeft):
     """
     Function to create document objects
     """
-    document = Document(dna, id, isLeft, n)
+    document = Document(dna, id, isLeft)
     return document
 
 
@@ -150,7 +308,7 @@ def memory_usage_resource():
     return mem
 
 
-def readData(fasta_file, k, n, log):
+def readData(fasta_file, k, log):
     """
     Extract the reads (DNA sequences) from the given fasta file
     """
@@ -172,7 +330,7 @@ def readData(fasta_file, k, n, log):
                         leftpart = read[:len(read)/2]
                         rightpart = read[len(read)/2:]
                         # Creates a doc object for the left part of the read
-                        documents.append(createDocument("", id, True, n))
+                        documents.append(createDocument("", id, True))
                         for shingle in iter(getDocShingles(leftpart, k)):
                             if shingle in kmerTable:
                                 kmerTable[shingle].append(id)
@@ -180,7 +338,7 @@ def readData(fasta_file, k, n, log):
                                 kmerTable[shingle] = [id]
                         id += 1
                         # Creates a doc object for the right part of the read
-                        documents.append(createDocument("", id, False, n))
+                        documents.append(createDocument("", id, False))
                         for shingle in iter(getDocShingles(rightpart, k)):
                             if shingle in kmerTable:
                                 kmerTable[shingle].append(id)
@@ -198,7 +356,7 @@ def readData(fasta_file, k, n, log):
                 leftpart = read[:len(read)/2]
                 rightpart = read[len(read)/2:]
                 # Creates a document object for the left part of the read
-                documents.append(createDocument("", id, True, n))
+                documents.append(createDocument("", id, True))
                 for shingle in iter(getDocShingles(leftpart, k)):
                     if shingle in kmerTable:
                         kmerTable[shingle].append(id)
@@ -206,7 +364,7 @@ def readData(fasta_file, k, n, log):
                         kmerTable[shingle] = [id]
                 id += 1
                 # Creates a document object for the right part of the read
-                documents.append(createDocument("", id, False, n))
+                documents.append(createDocument("", id, False))
                 for shingle in iter(getDocShingles(rightpart, k)):
                     if shingle in kmerTable:
                         kmerTable[shingle].append(id)
@@ -227,7 +385,7 @@ def readData(fasta_file, k, n, log):
         sys.exit()
 
 
-def readDataOld(fasta_file, n, log):
+def readDataOld(fasta_file, log):
     """
     Extract the reads (DNA sequences) from the given fasta file
     """
@@ -248,10 +406,10 @@ def readDataOld(fasta_file, n, log):
                         leftpart = read[:len(read)/2]
                         rightpart = read[len(read)/2:]
                         # Creates a doc object for the left part of the read
-                        documents.append(createDocument(leftpart, id, True, n))
+                        documents.append(createDocument(leftpart, id, True))
                         id += 1
                         # Creates a doc object for the right part of the read
-                        documents.append(createDocument(rightpart, id, False,n))
+                        documents.append(createDocument(rightpart, id, False))
                         id += 1
                         read = ""
                         seqs += 1
@@ -264,10 +422,10 @@ def readDataOld(fasta_file, n, log):
                 leftpart = read[:len(read)/2]
                 rightpart = read[len(read)/2:]
                 # Creates a document object for the left part of the read
-                documents.append(createDocument(leftpart, id, True, n))
+                documents.append(createDocument(leftpart, id, True))
                 id += 1
                 # Creates a document object for the right part of the read
-                documents.append(createDocument(rightpart, id, False, n))
+                documents.append(createDocument(rightpart, id, False))
                 seqs += 1
 
         print "Read", format(seqs, ',d'), "sequences in", \
@@ -324,7 +482,6 @@ def shinglingOld(docs, k, log):
     print "Shingling..."
     shingles = set()  # Contains all k-shingles in the dataset
     # shinglesDict = dict()
-    shingles = []
     for doc in docs:
         for i in xrange(len(doc.dna)-k+1):
             # create k-shingle (substring) from the document
@@ -475,7 +632,7 @@ def minhashingOld(docs, shingles, n, k, seed, log):
     for doc in docs:
         count += 1
         docShingles = getDocShingles(doc.dna, k)
-        # signature = [None for i in xrange(n)]
+        signature = [None for i in xrange(n)]
         # For each row in the 'character matrix'
         for r in xrange(len(shingles)):
             # If the shingle is in the document, then
@@ -483,12 +640,13 @@ def minhashingOld(docs, shingles, n, k, seed, log):
             if shingles[r] in docShingles:
                 # Find the 'first' shingle relative to each permutation
                 for i in xrange(n):
-                    if doc.signature[i] is None or doc.signature[i] > \
-                       hashfuncs[i][r]:
-                        doc.signature[i] = hashfuncs[i][r]
+                    if signature[i] is None or signature[i] > hashfuncs[i][r]:
+                        signature[i] = hashfuncs[i][r]
         # print sum(signature)
-        # doc.signature = signature
+        doc.signature = signature
         # print signature
+        if count < 20:
+            print doc.signature
         if count % 1000 == 0:
             print "Processed", count, "documents in", (time.clock() - tim) \
                   / 60, "minutes"
@@ -496,8 +654,99 @@ def minhashingOld(docs, shingles, n, k, seed, log):
     print "Finished minhashing in", (time.clock() - tim) / 60, "minutes"
     print "Memory usage (in mb):", memory_usage_resource()
 
+def minhashing_mem_ef(docs, shingles, buckets, k, rows, seed, log):
+    """
+    Create minhash signatures using the shingles
+    """
+    # Create n different permutations (hash functions) of the shingles
+    hashfuncs = []
+    for i in xrange(rows):
+        h = range(len(shingles))
+        random.shuffle(h)
+        hashfuncs.append(h)
+        # print h,"\n"
+    print "Computed hashfunctions"
 
-def LSH(documents, bands, rows, log):
+    tim = time.clock()
+    print "Minhashing..."
+    # Create minhash signatures as described in chapter 3 of the book Massive
+    # Data Mining
+    # Find signature for each document
+    count = 0
+    for doc in docs:
+        count += 1
+        docShingles = getDocShingles(doc.dna, k)
+        signature = [None for i in xrange(rows)]
+        # For each row in the 'character matrix'
+        for r in xrange(len(shingles)):
+            # If the shingle is in the document, then
+            # if doc.id in shinglesDict[shingles[r]]:
+            if shingles[r] in docShingles:
+                # Find the 'first' shingle relative to each permutation
+                for i in xrange(rows):
+                    if signature[i] is None or signature[i] > hashfuncs[i][r]:
+                        signature[i] = hashfuncs[i][r]
+        # print sum(signature)
+        key = int(''.join(map(str, signature)))
+        if key in buckets:
+            buckets[key].append(doc)
+        else:
+            buckets[key] = [doc]
+        # print signature
+        # if count < 20:
+        #     print signature
+        if count % 1000 == 0:
+            print "Processed", count, "documents in", (time.clock() - tim) \
+                  / 60, "minutes"
+
+    print "Finished minhashing in", (time.clock() - tim) / 60, "minutes"
+    print "Memory usage (in mb):", memory_usage_resource()
+
+def LSH(documents, bands, rows, shingles, k, seed, log):
+    """
+    Use Locality-Sensitive Hashing (LSH) with the banding technique to
+    hash similar elements to the same buckets.
+    """
+    index = 0
+    random.seed(seed)
+    for b in xrange(bands):
+        # For each band, create a bucket array with signature as key
+        buckets = dict([])
+        minhashing_mem_ef(documents, shingles, buckets, k, rows, seed, log)
+
+        tim = time.clock()
+        print "Running LSH..."
+        for bucket in buckets:
+            for i in xrange(len(buckets[bucket])):
+                doc1 = buckets[bucket][i]
+                for j in xrange(i+1, len(buckets[bucket])):
+                    doc2 = buckets[bucket][j]
+                    if doc1.isLeft and not doc2.isLeft:
+                        if doc1.id + 1 != doc2.id:
+                            doc1.similarTo.add(doc2)
+                    if not doc1.isLeft and doc2.isLeft:
+                        if doc1.id != doc2.id + 1:
+                            doc1.similarTo.add(doc2)
+
+        print "Number of buckets in band", b+1, ":", len(buckets)
+        numPairs = 0
+        for bucket in buckets:
+            inBucket = buckets[bucket]
+            numPairs += len(inBucket) * (len(inBucket)-1) / 2
+        print "Number of candidate pairs in band", b+1, ":", numPairs
+
+        print "Finished LSH for band", b, "in", (time.clock() - tim) / 60, \
+              "minutes"
+
+    count = 0
+    for doc in documents:
+        count += len(doc.similarTo)
+    print "Number of unique candidate pairs", count
+
+    print "Memory usage (in mb):", memory_usage_resource()
+
+
+def LSH_old(documents, bands, rows, log):
     """
     Use Locality-Sensitive Hashing (LSH) with the banding technique to
     hash similar elements to the same buckets.
@@ -547,7 +796,7 @@ def LSH(documents, bands, rows, log):
     print "Number of unique candidate pairs", count
 
     print "Finished LSH in", (time.clock() - tim) / 60, "minutes"
-    return None
+    print "Memory usage (in mb):", memory_usage_resource()
 
 
 # *************************************************************************** #
@@ -1033,18 +1282,24 @@ def main():
         print "ERROR: The number of bands and rows do not go into n"
         sys.exit()
 
+    read_data_seq(fasta_file)
+    #LSH_run(fasta_file, bands, rows, n, k, seed)
+    sys.exit()
+
     with open(log_file, 'w') as log:
-        old_version = False
+        old_version = True
 
         if old_version:
-            documents = readDataOld(fasta_file, n, log)
+            documents = readDataOld(fasta_file, log)
             shingles = shinglingOld(documents, k, log)
-            minhashingNew(documents, shingles, n, k, seed, log)
-            # minhashingOld(documents, shingles, n, k, seed, log)
+            # minhashingNew(documents, shingles, n, k, seed, log)
+            minhashingOld(documents, shingles, n, k, seed, log)
+            LSH_old(documents, bands, rows, log)
+            #LSH(documents, bands, rows, shingles, k, seed, log)
             sys.exit()
 
         # Read all reads from fasta file
-        documents, kmerTable = readData(fasta_file, k, n, log)
+        documents, kmerTable = readData(fasta_file, k, log)
 
         # documents = createDocuments(reads)
         # for doc in documents:
