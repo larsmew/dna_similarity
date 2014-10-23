@@ -232,7 +232,7 @@ def optionParse():
 
     parser.add_option("-f", "--fasta_file",
                       metavar="<FILENAME>",
-                      default="./Data/reads.fa",
+                      default="../Data/Fasta/reads.fa",
                       action="store",
                       dest="fasta_file",
                       help="set <FILENAME> as fasta file.")
@@ -256,7 +256,7 @@ def optionParse():
     parser.add_option("-b", "--bands",
                       metavar="<Value>",
                       type=int,
-                      default=4,
+                      default=25,
                       action="store",
                       dest="bands",
                       help="set <VALUE> as the number of bands for LSH.")
@@ -264,7 +264,7 @@ def optionParse():
     parser.add_option("-r", "--rows",
                       metavar="<Value>",
                       type=int,
-                      default=3,
+                      default=40,
                       action="store",
                       dest="rows",
                       help="set <VALUE> as the number of rows for LSH.")
@@ -609,6 +609,7 @@ def minhashingNew(docs, shingles, n, k, seed, log):
     print "Memory usage (in mb):", memory_usage_resource()
 
 
+@profile
 def minhashingOld(docs, shingles, n, k, seed, log):
     """
     Create minhash signatures using the shingles
@@ -645,8 +646,6 @@ def minhashingOld(docs, shingles, n, k, seed, log):
         # print sum(signature)
         doc.signature = signature
         # print signature
-        if count < 20:
-            print doc.signature
         if count % 1000 == 0:
             print "Processed", count, "documents in", (time.clock() - tim) \
                   / 60, "minutes"
@@ -1282,9 +1281,9 @@ def main():
         print "ERROR: The number of bands and rows do not go into n"
         sys.exit()
 
-    read_data_seq(fasta_file)
+    #read_data_seq(fasta_file)
     #LSH_run(fasta_file, bands, rows, n, k, seed)
-    sys.exit()
+    #sys.exit()
 
     with open(log_file, 'w') as log:
         old_version = True
