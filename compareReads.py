@@ -15,9 +15,6 @@ import sys
 import time
 import random
 # import os
-# import math
-# import numpy
-# import nwalign as nw
 
 
 def read_data_seq(fasta_file):
@@ -40,13 +37,13 @@ def read_data_seq(fasta_file):
             else:
                 read += line.strip().upper()
 
-        print "Finished minhashing in", (time.clock() - tim) / 60, "minutes"
+        print "Finished reading in", (time.clock() - tim) / 60, "minutes"
         print "Memory usage (in mb):", memory_usage_resource()
 
 def LSH_run(fasta_file, bands, rows, n, k, seed):
     if fasta_file:
         tim = time.clock()
-        shingles = getAllShingles(fasta_file, k)
+        shingles = computeAllShingles(fasta_file, k)
 
         random.seed(seed)
         for b in xrange(bands):
@@ -74,7 +71,7 @@ def computeHashes(rows, shingles):
     print "Computed hashfunctions"
 
 
-def getAllShingles(fasta_file, k):
+def computeAllShingles(fasta_file, k):
     print "Shingling..."
     tim = time.clock()
     with open(fasta_file, "rU") as fasta_file:
@@ -308,84 +305,7 @@ def memory_usage_resource():
     return mem
 
 
-def readData(fasta_file, k, log):
-    """
-    Extract the reads (DNA sequences) from the given fasta file
-    """
-    if fasta_file:
-        print "Processing fasta file..."
-        tim = time.clock()
-        documents = []
-        kmerTable = dict()
-        seqs = 0
-        id = 0
-        with open(fasta_file, "rU") as fasta_file:
-            read = ""
-            for line in fasta_file:
-                # If line starts with ">", which indicates end of a sequence
-                # Then, append it to list of reads
-                if line.startswith(">"):
-                    if read != "":
-                        # Splits the string into two parts
-                        leftpart = read[:len(read)/2]
-                        rightpart = read[len(read)/2:]
-                        # Creates a doc object for the left part of the read
-                        documents.append(createDocument("", id, True))
-                        for shingle in iter(getDocShingles(leftpart, k)):
-                            if shingle in kmerTable:
-                                kmerTable[shingle].append(id)
-                            else:
-                                kmerTable[shingle] = [id]
-                        id += 1
-                        # Creates a doc object for the right part of the read
-                        documents.append(createDocument("", id, False))
-                        for shingle in iter(getDocShingles(rightpart, k)):
-                            if shingle in kmerTable:
-                                kmerTable[shingle].append(id)
-                            else:
-                                kmerTable[shingle] = [id]
-                        id += 1
-                        read = ""
-                        seqs += 1
-                # Concatenate multi-line sequences into one string
-                else:
-                    read += line.strip().upper()
-            # Append the last read in the file to the list
-            if read != "":
-                # Splits the string into two parts
-                leftpart = read[:len(read)/2]
-                rightpart = read[len(read)/2:]
-                # Creates a document object for the left part of the read
-                documents.append(createDocument("", id, True))
-                for shingle in iter(getDocShingles(leftpart, k)):
-                    if shingle in kmerTable:
-                        kmerTable[shingle].append(id)
-                    else:
-                        kmerTable[shingle] = [id]
-                id += 1
-                # Creates a document object for the right part of the read
-                documents.append(createDocument("", id, False))
-                for shingle in iter(getDocShingles(rightpart, k)):
-                    if shingle in kmerTable:
-                        kmerTable[shingle].append(id)
-                    else:
-                        kmerTable[shingle] = [id]
-                seqs += 1
-        #with redirect_stdout(log):
-        print "Read", format(seqs, ',d'), "sequences in", \
-              (time.clock() - tim) / 60, "minutes"
-        # log.write("Read " + str(format(seqs, ',d')) + " sequences in " \
-        #       + str((time.clock() - tim) / 60) + " minutes")
-
-        print "Memory usage (in mb):", memory_usage_resource()
-        return documents, kmerTable
-
-    else:
-        print("ERROR: NO FASTA FILE GIVEN")
-        sys.exit()
-
-
-def readDataOld(fasta_file, log):
+def readData(fasta_file, log):
     """
     Extract the reads (DNA sequences) from the given fasta file
     """
@@ -452,124 +372,39 @@ def readDataOld(fasta_file, log):
 # *************************************************************************** #
 def getDocShingles(dna, k):
     # shingles = set()
-    # for i in xrange(len(dna)-k+1):
-    #     # create k-shingle (substring) from the document
-    #     shingle = dna[i:i+k]
-    #     # Add it to the set of all shingles
-    #     shingles.add(shingle)
-    shingles = {dna[i:i+k] for i in xrange(len(dna)-k+1)}
-    return shingles
-
-
-def getDocShinglesOld(doc, k):
-    # shingles = set()
     # for i in xrange(len(doc.dna)-k+1):
     #     # create k-shingle (substring) from the document
     #     shingle = doc.dna[i:i+k]
     #     # Add it to the set of all shingles
     #     shingles.add(shingle)
     #shingles = set(doc.dna[i:i+k] for i in xrange(len(doc.dna)-k+1))
-    shingles = {doc.dna[i:i+k] for i in xrange(len(doc.dna)-k+1)}
+    shingles = {dna[i:i+k] for i in xrange(len(dna)-k+1)}
     return shingles
 
 
-def shingling(kmerTable, log):
-    tim = time.clock()
-    print "Shingling..."
-
-    shingles = ([shingle for shingle in kmerTable])
-
-    print "Finished shingling in", (time.clock() - tim) / 60, "minutes"
-    print "Number of shingles:", len(shingles)
-    print "Memory usage (in mb):", memory_usage_resource()
-    return shingles
-
-
-def shinglingOld(docs, k, log):
+def shingling(docs, k, log):
     tim = time.clock()
     print "Shingling..."
     log.write("Shingling...\n")
-    shingles = set()  # Contains all k-shingles in the dataset
-    # shinglesDict = dict()
-    for doc in docs:
-        for i in xrange(len(doc.dna)-k+1):
-            # create k-shingle (substring) from the document
-            shingle = doc.dna[i:i+k]
-            # Add it to the set of all shingles
-            shingles.add(shingle)
-            # if shingle in shinglesDict:
-            #     shinglesDict[shingle].add(doc.id)
-            # else:
-            #     shinglesDict[shingle] = set([doc.id])
+
+    shingles = {doc.dna[i:i+k] for doc in docs for i in
+                xrange(len(doc.dna)-k+1)}
+    # shingles = set()  # Contains all k-shingles in the dataset
+    # for doc in docs:
+    #     for i in xrange(len(doc.dna)-k+1):
+    #         # create k-shingle (substring) from the document
+    #         shingle = doc.dna[i:i+k]
+    #         # Add it to the set of all shingles
+    #         shingles.add(shingle)
+
     print "Finished shingling in", (time.clock() - tim) / 60, "minutes"
-    print "Number of shingles:", len(shingles)
+    log.write("Finished shingling in"+ str((time.clock() - tim) / 60) +
+              "minutes\n")
+    print "Number of shingles: ", len(shingles)
+    log.write("Number of shingles: "+ str(len(shingles))+"\n")
     print "Memory usage (in mb):", memory_usage_resource()
     log.write("Memory usage (in mb):" + str(memory_usage_resource())+"\n")
     return list(shingles)
-
-
-def minhashing(docs, shingles, kmerTable, n, k, seed, log):
-    """
-    Create minhash signatures using the shingles
-    """
-    tim = time.clock()
-    print "Minhashing..."
-    random.seed(seed)
-
-    count = 0
-    for i in xrange(n):
-        count += 1
-        h = range(len(shingles))
-        random.shuffle(h)
-        fields = len(docs)
-        for r in xrange(len(shingles)):
-            if fields == 0:
-                break
-            shinglesInDoc = kmerTable[shingles[h[r]]]
-            for docID in shinglesInDoc:
-                if docs[docID].signature[i] == None:
-                    docs[docID].signature[i] = r
-                    fields -= 1
-        if count % 50 == 0:
-            print "Processed", count, "columns in", (time.clock() - tim) \
-                  / 60, "minutes"
-
-    print "Finished minhashing in", (time.clock() - tim) / 60, "minutes"
-    print "Memory usage (in mb):", memory_usage_resource()
-
-
-def minhashing2(docs, shingles, kmerTable, n, k, seed, log):
-    """
-    Create minhash signatures using the shingles
-    """
-    tim = time.clock()
-    print "Minhashing..."
-    hashfuncs = []
-    random.seed(seed)
-    for i in xrange(n):
-        h = range(len(shingles))
-        random.shuffle(h)
-        hashfuncs.append(h)
-        # print h,"\n"
-    print "Computed hashfunctions"
-
-    # for doc in docs:
-
-
-    count = 0
-    for i in xrange(n):
-        count += 1
-        h = range(len(shingles))
-        random.shuffle(h)
-        for r, shingle in enumerate(shingles):
-            for docID in iter(kmerTable[shingles[h[r]]]):
-                if docs[docID].signature[i] == None or docs[docID].signature[i] > h[r]:
-                    docs[docID].signature[i] = h[r]
-        if count % 50 == 0:
-            print "Processed", count, "columns in", (time.clock() - tim) \
-                  / 60, "minutes"
-
-    print "Finished minhashing in", (time.clock() - tim) / 60, "minutes"
 
 
 def minhashingNew(docs, shingles, n, k, seed, log):
@@ -700,7 +535,7 @@ def minhashingOld2(docs, shingles, n, k, seed, log):
         count += 1
         signature = []
         tim2 = time.clock()
-        docShingles = getDocShinglesOld(doc, k)
+        docShingles = getDocShinglesOld(doc.dna, k)
         docShingleTime += time.clock() - tim2
         for h in hashfuncs:
             #minVal = min((h[shinglePos[shingle]] for shingle in docShingles))
@@ -1404,41 +1239,28 @@ def main():
     #sys.exit()
 
     with open(log_file, 'w') as log:
-        old_version = True
-
-        if old_version:
-            documents = readDataOld(fasta_file, log)
-            shingles = shinglingOld(documents, k, log)
-            #minhashingNew(documents, shingles, n, k, seed, log)
-            minhashingOld(documents, shingles, n, k, seed, log)
-            #minhashingOld2(documents, shingles, n, k, seed, log)
-            #minhashingOld3(documents, shingles, n, k, seed, log)
-            LSH_old(documents, bands, rows, log)
-            # LSH(documents, bands, rows, shingles, k, seed, log)
-            sys.exit()
 
         # Read all reads from fasta file
-        documents, kmerTable = readData(fasta_file, k, log)
+        documents = readData(fasta_file, log)
 
-        # documents = createDocuments(reads)
-        # for doc in documents:
-        #     print doc.dna, doc.id, doc.isLeft
-
-        shingles = shingling(kmerTable, log)
-        # shingles = list(shinglingOld(documents, k))
-        # print shingles
-        # print len(shingles)
+        # Compute all shingles in the data set
+        shingles = shingling(documents, k, log)
 
         # compareAllPairs(documents, k, sim_measure)
         # sys.exit()
+
+        #minhashingNew(documents, shingles, n, k, seed, log)
+        minhashingOld(documents, shingles, n, k, seed, log)
+        #minhashingOld2(documents, shingles, n, k, seed, log)
+        #minhashingOld3(documents, shingles, n, k, seed, log)
+        LSH_old(documents, bands, rows, log)
+        # LSH(documents, bands, rows, shingles, k, seed, log)
 
         print "Seed:", seed
         minhashing(documents, shingles, kmerTable, n, k, seed, log)
         # minhashingNew(documents, shingles, n, k, seed, log)
         # minhashingOld(documents, shingles, n, k, seed, log)
 
-
-        sys.exit()
 
         # band_buckets = LSH_Old(documents, bands, rows)
         LSH(documents, bands, rows, log)
