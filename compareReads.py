@@ -391,6 +391,7 @@ def readDataOld(fasta_file, log):
     """
     if fasta_file:
         print "Processing fasta file..."
+        log.write("Processing fasta file...\n")
         tim = time.clock()
         documents = []
         seqs = 0
@@ -430,13 +431,17 @@ def readDataOld(fasta_file, log):
 
         print "Read", format(seqs, ',d'), "sequences in", \
               (time.clock() - tim) / 60, "minutes"
-        # log.write("Read " + str(format(seqs, ',d')) + " sequences in " \
-        #       + str((time.clock() - tim) / 60) + " minutes")
+        log.write("Read " + str(format(seqs, ',d')) + " sequences in " \
+              + str((time.clock() - tim) / 60) + " minutes\n")
 
         print "Memory usage (in mb):", memory_usage_resource()
+        log.write("Memory usage (in mb):"+ str(memory_usage_resource())+"\n")
+        log.flush()
         return documents
+
     else:
         print("ERROR: NO FASTA FILE GIVEN")
+        log.write("ERROR: NO FASTA FILE GIVEN")
         sys.exit()
 
 
@@ -446,22 +451,25 @@ def readDataOld(fasta_file, log):
 #                                                                             #
 # *************************************************************************** #
 def getDocShingles(dna, k):
-    shingles = set()
-    for i in xrange(len(dna)-k+1):
-        # create k-shingle (substring) from the document
-        shingle = dna[i:i+k]
-        # Add it to the set of all shingles
-        shingles.add(shingle)
+    # shingles = set()
+    # for i in xrange(len(dna)-k+1):
+    #     # create k-shingle (substring) from the document
+    #     shingle = dna[i:i+k]
+    #     # Add it to the set of all shingles
+    #     shingles.add(shingle)
+    shingles = {dna[i:i+k] for i in xrange(len(dna)-k+1)}
     return shingles
 
 
 def getDocShinglesOld(doc, k):
-    shingles = set()
-    for i in xrange(len(doc.dna)-k+1):
-        # create k-shingle (substring) from the document
-        shingle = doc.dna[i:i+k]
-        # Add it to the set of all shingles
-        shingles.add(shingle)
+    # shingles = set()
+    # for i in xrange(len(doc.dna)-k+1):
+    #     # create k-shingle (substring) from the document
+    #     shingle = doc.dna[i:i+k]
+    #     # Add it to the set of all shingles
+    #     shingles.add(shingle)
+    #shingles = set(doc.dna[i:i+k] for i in xrange(len(doc.dna)-k+1))
+    shingles = {doc.dna[i:i+k] for i in xrange(len(doc.dna)-k+1)}
     return shingles
 
 
@@ -480,6 +488,7 @@ def shingling(kmerTable, log):
 def shinglingOld(docs, k, log):
     tim = time.clock()
     print "Shingling..."
+    log.write("Shingling...\n")
     shingles = set()  # Contains all k-shingles in the dataset
     # shinglesDict = dict()
     for doc in docs:
@@ -495,6 +504,7 @@ def shinglingOld(docs, k, log):
     print "Finished shingling in", (time.clock() - tim) / 60, "minutes"
     print "Number of shingles:", len(shingles)
     print "Memory usage (in mb):", memory_usage_resource()
+    log.write("Memory usage (in mb):" + str(memory_usage_resource())+"\n")
     return list(shingles)
 
 
@@ -584,21 +594,20 @@ def minhashingNew(docs, shingles, n, k, seed, log):
     # Data Mining
     # Find signature for each document
     count = 0
+    #shotTim = 0
     for doc in docs:
         count += 1
         docShingles = getDocShingles(doc.dna, k)
         signature = [None for i in xrange(n)]
         # For each row in the 'character matrix'
-        occupied = 0
-        #while occupied < len(signature):
-        for r in xrange(len(shingles)):
-            if occupied == len(signature):
-                break
-            for i in xrange(n):
-                if signature[i] is None:
-                    if shingles[hashfuncs[i][r]] in docShingles:
-                        signature[i] = r
-                        occupied += 1
+        for sigPos in xrange(n):
+            for h in hashfuncs[sigPos]:
+                #tim2 = time.clock()
+                if shingles[h] in docShingles:
+                    signature[sigPos] = h
+                    #shotTim += time.clock() - tim2
+                    break
+                #shotTim += time.clock() - tim2
         doc.signature = signature
         # print signature
         if count % 1000 == 0:
@@ -606,10 +615,11 @@ def minhashingNew(docs, shingles, n, k, seed, log):
                   / 60, "minutes"
 
     print "Finished minhashing in", (time.clock() - tim) / 60, "minutes"
+    #print "Comparison time:", shotTim / 60, "minutes"
     print "Memory usage (in mb):", memory_usage_resource()
+    log.write("Memory usage (in mb):" + str(memory_usage_resource())+"\n")
 
 
-@profile
 def minhashingOld(docs, shingles, n, k, seed, log):
     """
     Create minhash signatures using the shingles
@@ -652,6 +662,110 @@ def minhashingOld(docs, shingles, n, k, seed, log):
 
     print "Finished minhashing in", (time.clock() - tim) / 60, "minutes"
     print "Memory usage (in mb):", memory_usage_resource()
+    log.write("Memory usage (in mb):" + str(memory_usage_resource())+"\n")
+
+
+def minhashingOld2(docs, shingles, n, k, seed, log):
+    """
+    Create minhash signatures using the shingles
+    """
+    tim = time.clock()
+    # shinglePos = dict()
+    # for i, shingle in enumerate(shingles):
+    #     shinglePos[shingle] = i
+    shinglePos = {shingle: i for i, shingle in enumerate(shingles)}
+    print "dict time:", time.clock() - tim
+
+    # Create n different permutations (hash functions) of the shingles
+    hashfuncs = []
+    random.seed(seed)
+    numShingles = len(shingles)
+    for i in xrange(n):
+        h = range(numShingles)
+        random.shuffle(h)
+        hashfuncs.append(h)
+        # print h,"\n"
+    print "Computed hashfunctions"
+    log.write("Computed hashfunctions\n")
+
+    tim = time.clock()
+    print "Minhashing..."
+    log.write("Minhashing...\n")
+    # Create minhash signatures as described in chapter 3 of the book Massive
+    # Data Mining
+    # Find signature for each document
+    docShingleTime = 0
+    count = 0
+    for doc in docs:
+        count += 1
+        signature = []
+        tim2 = time.clock()
+        docShingles = getDocShinglesOld(doc, k)
+        docShingleTime += time.clock() - tim2
+        for h in hashfuncs:
+            #minVal = min((h[shinglePos[shingle]] for shingle in docShingles))
+            minVal = numShingles+1
+            for shingle in docShingles:
+                pos = shinglePos[shingle]
+                if h[pos] < minVal:
+                    minVal = h[pos]
+            signature.append(minVal)
+        doc.signature = signature
+        # print signature
+        if count % 1000 == 0:
+            print "Processed", count, "documents in", (time.clock() - tim) \
+                  / 60, "minutes"
+
+    print "docShingleTime:", docShingleTime
+    sys.exit()
+    print "Finished minhashing in", (time.clock() - tim) / 60, "minutes"
+    log.write("Finished minhashing in"+ str((time.clock() - tim) / 60)+
+              "minutes\n")
+    print "Memory usage (in mb):", memory_usage_resource()
+    log.write("Memory usage (in mb):" + str(memory_usage_resource())+"\n")
+
+
+def minhashingOld3(docs, shingles, n, k, seed, log):
+    """
+    Create minhash signatures using the shingles
+    """
+    random.seed(seed)
+    numShingles = len(shingles)
+    hashfuncs = []
+    for i in xrange(n):
+        h = range(numShingles)
+        random.shuffle(h)
+        shinglePos = {shingle: h[i] for i, shingle in enumerate(shingles)}
+        hashfuncs.append(shinglePos)
+
+    tim = time.clock()
+    print "Minhashing..."
+    log.write("Minhashing...\n")
+    count = 0
+    for doc in docs:
+        count += 1
+        signature = []
+        docShingles = getDocShinglesOld(doc, k)
+        for h in hashfuncs:
+            #print [h[shingle] for shingle in docShingles]
+            #print min(h[shingle] for shingle in docShingles)
+            #signature.append(min(h[shingle] for shingle in docShingles))
+            minVal = numShingles+1
+            for shingle in docShingles:
+                if h[shingle] < minVal:
+                    minVal = h[shingle]
+            signature.append(minVal)
+        doc.signature = signature
+        if count % 1000 == 0:
+            print "Processed", count, "documents in", (time.clock() - tim) \
+                  / 60, "minutes"
+
+    print "Finished minhashing in", (time.clock() - tim) / 60, "minutes"
+    log.write("Finished minhashing in"+ str((time.clock() - tim) / 60)+
+              "minutes\n")
+    print "Memory usage (in mb):", memory_usage_resource()
+    log.write("Memory usage (in mb):" + str(memory_usage_resource())+"\n")
+
 
 def minhashing_mem_ef(docs, shingles, buckets, k, rows, seed, log):
     """
@@ -700,6 +814,8 @@ def minhashing_mem_ef(docs, shingles, buckets, k, rows, seed, log):
 
     print "Finished minhashing in", (time.clock() - tim) / 60, "minutes"
     print "Memory usage (in mb):", memory_usage_resource()
+    log.write("Memory usage (in mb):" + str(memory_usage_resource())+"\n")
+
 
 def LSH(documents, bands, rows, shingles, k, seed, log):
     """
@@ -743,6 +859,7 @@ def LSH(documents, bands, rows, shingles, k, seed, log):
     print "Number of unique candidate pairs", count
 
     print "Memory usage (in mb):", memory_usage_resource()
+    log.write("Memory usage (in mb):" + str(memory_usage_resource())+"\n")
 
 
 def LSH_old(documents, bands, rows, log):
@@ -796,6 +913,7 @@ def LSH_old(documents, bands, rows, log):
 
     print "Finished LSH in", (time.clock() - tim) / 60, "minutes"
     print "Memory usage (in mb):", memory_usage_resource()
+    log.write("Memory usage (in mb):" + str(memory_usage_resource())+"\n")
 
 
 # *************************************************************************** #
@@ -1291,10 +1409,12 @@ def main():
         if old_version:
             documents = readDataOld(fasta_file, log)
             shingles = shinglingOld(documents, k, log)
-            # minhashingNew(documents, shingles, n, k, seed, log)
+            #minhashingNew(documents, shingles, n, k, seed, log)
             minhashingOld(documents, shingles, n, k, seed, log)
+            #minhashingOld2(documents, shingles, n, k, seed, log)
+            #minhashingOld3(documents, shingles, n, k, seed, log)
             LSH_old(documents, bands, rows, log)
-            #LSH(documents, bands, rows, shingles, k, seed, log)
+            # LSH(documents, bands, rows, shingles, k, seed, log)
             sys.exit()
 
         # Read all reads from fasta file
