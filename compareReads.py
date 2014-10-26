@@ -71,8 +71,8 @@ def computeHashes(rows, shingles):
     print "Computed hashfunctions"
 
 
-def computeAllShingles(fasta_file, k):
-    print "Shingling..."
+def computeAllShingles(fasta_file, k, log):
+    logprint(log, False, "Computing all shingles...")
     tim = time.clock()
     with open(fasta_file, "rU") as fasta_file:
         shingles = set()
@@ -93,9 +93,20 @@ def computeAllShingles(fasta_file, k):
             # Concatenate multi-line sequences into one string
             else:
                 read += line.strip().upper()
-        print "Finished shingling in", (time.clock() - tim) / 60, "minutes"
-        print "Number of shingles:", len(shingles)
-        print "Memory usage (in mb):", memory_usage_resource()
+        # Compute shingles from last read
+        if read != "":
+            # Splits the string into two parts
+            leftpart = read[:len(read)/2]
+            for shingle in getDocShingles(leftpart, k):
+                shingles.add(shingle)
+            rightpart = read[len(read)/2:]
+            for shingle in getDocShingles(rightpart, k):
+                shingles.add(shingle)
+
+        logprint(log, False, "Finished shingling in", (time.clock() - tim) /
+                 60, "minutes")
+        logprint(log, False, "Number of shingles:", len(shingles))
+        logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
         return list(shingles)
 
 
@@ -266,13 +277,21 @@ def optionParse():
                       dest="rows",
                       help="set <VALUE> as the number of rows for LSH.")
 
-    parser.add_option("-m", "--similarity_measure",
+    parser.add_option("-x", "--similarity_measure",
                       metavar="<VALUE>",
                       type=str,
                       default="naive",
                       action="store",
-                      dest="m",
+                      dest="sim",
                       help="set <VALUE> as similairy measure to use.")
+
+    parser.add_option("-m", "--minhash_alg",
+                      metavar="<VALUE>",
+                      type=int,
+                      default="1",
+                      action="store",
+                      dest="m",
+                      help="<VALUE> defines the minhash algorithm used.")
 
     parser.add_option("-s", "--seed",
                       metavar="<VALUE>",
@@ -292,7 +311,8 @@ def optionParse():
     (options, args) = parser.parse_args()
 
     return options.fasta_file, options.k, options.threshold,\
-        options.bands, options.rows, options.m, options.s, options.log
+        options.bands, options.rows, options.sim, options.m, \
+        options.s, options.log
 
 
 def memory_usage_resource():
@@ -305,13 +325,26 @@ def memory_usage_resource():
     return mem
 
 
+def logprint(log_file, flush, *output):
+    """
+    Prints to standard out and to log file
+    """
+    log_output = ""
+    for element in output:
+        log_output += str(element) + " "
+    print log_output
+    log_output += "\n"
+    log_file.write(log_output)
+    if flush:
+        log_file.flush()
+
+
 def readData(fasta_file, log):
     """
     Extract the reads (DNA sequences) from the given fasta file
     """
     if fasta_file:
-        print "Processing fasta file..."
-        log.write("Processing fasta file...\n")
+        logprint(log, False, "Processing fasta file...")
         tim = time.clock()
         documents = []
         seqs = 0
@@ -349,19 +382,13 @@ def readData(fasta_file, log):
                 documents.append(createDocument(rightpart, id, False))
                 seqs += 1
 
-        print "Read", format(seqs, ',d'), "sequences in", \
-              (time.clock() - tim) / 60, "minutes"
-        log.write("Read " + str(format(seqs, ',d')) + " sequences in " \
-              + str((time.clock() - tim) / 60) + " minutes\n")
-
-        print "Memory usage (in mb):", memory_usage_resource()
-        log.write("Memory usage (in mb):"+ str(memory_usage_resource())+"\n")
-        log.flush()
+        logprint(log, False, "Read", format(seqs, ',d'), "sequences in",
+                 (time.clock() - tim) / 60, "minutes")
+        logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
         return documents
 
     else:
-        print("ERROR: NO FASTA FILE GIVEN")
-        log.write("ERROR: NO FASTA FILE GIVEN")
+        logprint(log, False, "ERROR: NO FASTA FILE GIVEN")
         sys.exit()
 
 
@@ -384,8 +411,7 @@ def getDocShingles(dna, k):
 
 def shingling(docs, k, log):
     tim = time.clock()
-    print "Shingling..."
-    log.write("Shingling...\n")
+    logprint(log, False, "Shingling...")
 
     shingles = {doc.dna[i:i+k] for doc in docs for i in
                 xrange(len(doc.dna)-k+1)}
@@ -397,14 +423,18 @@ def shingling(docs, k, log):
     #         # Add it to the set of all shingles
     #         shingles.add(shingle)
 
-    print "Finished shingling in", (time.clock() - tim) / 60, "minutes"
-    log.write("Finished shingling in"+ str((time.clock() - tim) / 60) +
-              "minutes\n")
-    print "Number of shingles: ", len(shingles)
-    log.write("Number of shingles: "+ str(len(shingles))+"\n")
-    print "Memory usage (in mb):", memory_usage_resource()
-    log.write("Memory usage (in mb):" + str(memory_usage_resource())+"\n")
+    logprint(log, False, "Finished shingling in", (time.clock() - tim) / 60,
+             "minutes")
+    logprint(log, False, "Number of shingles:", len(shingles))
+    logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
     return list(shingles)
+
+
+def hashFuncGenerator(n, shingles):
+    for i in xrange(n):
+        h = range(len(shingles))
+        random.shuffle(h)
+        yield h
 
 
 def minhashingNew(docs, shingles, n, k, seed, log):
@@ -424,12 +454,11 @@ def minhashingNew(docs, shingles, n, k, seed, log):
     print "Computed hashfunctions in", (time.clock() - tim) / 60, "minutes"
 
     tim = time.clock()
-    print "Minhashing..."
+    logprint(log, False, "Minhashing...")
     # Create minhash signatures as described in chapter 3 of the book Massive
     # Data Mining
     # Find signature for each document
     count = 0
-    #shotTim = 0
     for doc in docs:
         count += 1
         docShingles = getDocShingles(doc.dna, k)
@@ -437,22 +466,18 @@ def minhashingNew(docs, shingles, n, k, seed, log):
         # For each row in the 'character matrix'
         for sigPos in xrange(n):
             for h in hashfuncs[sigPos]:
-                #tim2 = time.clock()
                 if shingles[h] in docShingles:
                     signature[sigPos] = h
-                    #shotTim += time.clock() - tim2
                     break
-                #shotTim += time.clock() - tim2
         doc.signature = signature
         # print signature
         if count % 1000 == 0:
-            print "Processed", count, "documents in", (time.clock() - tim) \
-                  / 60, "minutes"
+            logprint(log, True, "Processed", count, "documents in",
+                     (time.clock() - tim) / 60, "minutes")
 
-    print "Finished minhashing in", (time.clock() - tim) / 60, "minutes"
-    #print "Comparison time:", shotTim / 60, "minutes"
-    print "Memory usage (in mb):", memory_usage_resource()
-    log.write("Memory usage (in mb):" + str(memory_usage_resource())+"\n")
+    logprint(log, False, "Finished minhashing in", (time.clock() - tim) / 60,
+             "minutes")
+    logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
 
 
 def minhashingOld(docs, shingles, n, k, seed, log):
@@ -460,17 +485,16 @@ def minhashingOld(docs, shingles, n, k, seed, log):
     Create minhash signatures using the shingles
     """
     # Create n different permutations (hash functions) of the shingles
-    hashfuncs = []
     random.seed(seed)
-    for i in xrange(n):
-        h = range(len(shingles))
-        random.shuffle(h)
-        hashfuncs.append(h)
-        # print h,"\n"
+    # hashfuncs = []
+    # for i in xrange(n):
+    #     h = range(len(shingles))
+    #     random.shuffle(h)
+    #     hashfuncs.append(h)
     print "Computed hashfunctions"
 
     tim = time.clock()
-    print "Minhashing..."
+    logprint(log, False, "Minhashing...")
     # Create minhash signatures as described in chapter 3 of the book Massive
     # Data Mining
     # Find signature for each document
@@ -485,19 +509,23 @@ def minhashingOld(docs, shingles, n, k, seed, log):
             # if doc.id in shinglesDict[shingles[r]]:
             if shingles[r] in docShingles:
                 # Find the 'first' shingle relative to each permutation
-                for i in xrange(n):
-                    if signature[i] is None or signature[i] > hashfuncs[i][r]:
-                        signature[i] = hashfuncs[i][r]
-        # print sum(signature)
+                for i, hashfunc in enumerate(hashFuncGenerator(n, shingles)):
+                    #print hashfunc
+                    if signature[i] is None or signature[i] > hashfunc[r]:
+                        signature[i] = hashfunc[r]
+                # for i in xrange(n):
+                #     print hashfuncs[i]
+                #     if signature[i] is None or signature[i] > hashfuncs[i][r]:
+                #         signature[i] = hashfuncs[i][r]
+        #print signature
         doc.signature = signature
-        # print signature
         if count % 1000 == 0:
-            print "Processed", count, "documents in", (time.clock() - tim) \
-                  / 60, "minutes"
+            logprint(log, True, "Processed", count, "documents in",
+                     (time.clock() - tim) / 60, "minutes")
 
-    print "Finished minhashing in", (time.clock() - tim) / 60, "minutes"
-    print "Memory usage (in mb):", memory_usage_resource()
-    log.write("Memory usage (in mb):" + str(memory_usage_resource())+"\n")
+    logprint(log, False, "Finished minhashing in", (time.clock() - tim) / 60,
+             "minutes")
+    logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
 
 
 def minhashingOld2(docs, shingles, n, k, seed, log):
@@ -524,19 +552,18 @@ def minhashingOld2(docs, shingles, n, k, seed, log):
     log.write("Computed hashfunctions\n")
 
     tim = time.clock()
-    print "Minhashing..."
-    log.write("Minhashing...\n")
+    logprint(log, False, "Minhashing...")
     # Create minhash signatures as described in chapter 3 of the book Massive
     # Data Mining
     # Find signature for each document
-    docShingleTime = 0
+    #docShingleTime = 0
     count = 0
     for doc in docs:
         count += 1
         signature = []
-        tim2 = time.clock()
-        docShingles = getDocShinglesOld(doc.dna, k)
-        docShingleTime += time.clock() - tim2
+        #tim2 = time.clock()
+        docShingles = getDocShingles(doc.dna, k)
+        #docShingleTime += time.clock() - tim2
         for h in hashfuncs:
             #minVal = min((h[shinglePos[shingle]] for shingle in docShingles))
             minVal = numShingles+1
@@ -548,16 +575,13 @@ def minhashingOld2(docs, shingles, n, k, seed, log):
         doc.signature = signature
         # print signature
         if count % 1000 == 0:
-            print "Processed", count, "documents in", (time.clock() - tim) \
-                  / 60, "minutes"
+            logprint(log, True, "Processed", count, "documents in",
+                     (time.clock() - tim) / 60, "minutes")
 
-    print "docShingleTime:", docShingleTime
-    sys.exit()
-    print "Finished minhashing in", (time.clock() - tim) / 60, "minutes"
-    log.write("Finished minhashing in"+ str((time.clock() - tim) / 60)+
-              "minutes\n")
-    print "Memory usage (in mb):", memory_usage_resource()
-    log.write("Memory usage (in mb):" + str(memory_usage_resource())+"\n")
+    #print "docShingleTime:", docShingleTime
+    logprint(log, False, "Finished minhashing in", (time.clock() - tim) / 60,
+             "minutes")
+    logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
 
 
 def minhashingOld3(docs, shingles, n, k, seed, log):
@@ -574,8 +598,7 @@ def minhashingOld3(docs, shingles, n, k, seed, log):
         hashfuncs.append(shinglePos)
 
     tim = time.clock()
-    print "Minhashing..."
-    log.write("Minhashing...\n")
+    logprint(log, False, "Minhashing...")
     count = 0
     for doc in docs:
         count += 1
@@ -592,14 +615,12 @@ def minhashingOld3(docs, shingles, n, k, seed, log):
             signature.append(minVal)
         doc.signature = signature
         if count % 1000 == 0:
-            print "Processed", count, "documents in", (time.clock() - tim) \
-                  / 60, "minutes"
+            logprint(log, True, "Processed", count, "documents in",
+                     (time.clock() - tim) / 60, "minutes")
 
-    print "Finished minhashing in", (time.clock() - tim) / 60, "minutes"
-    log.write("Finished minhashing in"+ str((time.clock() - tim) / 60)+
-              "minutes\n")
-    print "Memory usage (in mb):", memory_usage_resource()
-    log.write("Memory usage (in mb):" + str(memory_usage_resource())+"\n")
+    logprint(log, False, "Finished minhashing in", (time.clock() - tim) / 60,
+             "minutes")
+    logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
 
 
 def minhashing_mem_ef(docs, shingles, buckets, k, rows, seed, log):
@@ -616,7 +637,7 @@ def minhashing_mem_ef(docs, shingles, buckets, k, rows, seed, log):
     print "Computed hashfunctions"
 
     tim = time.clock()
-    print "Minhashing..."
+    logprint(log, False, "Minhashing...")
     # Create minhash signatures as described in chapter 3 of the book Massive
     # Data Mining
     # Find signature for each document
@@ -644,12 +665,12 @@ def minhashing_mem_ef(docs, shingles, buckets, k, rows, seed, log):
         # if count < 20:
         #     print signature
         if count % 1000 == 0:
-            print "Processed", count, "documents in", (time.clock() - tim) \
-                  / 60, "minutes"
+            logprint(log, True, "Processed", count, "documents in",
+                     (time.clock() - tim) / 60, "minutes")
 
-    print "Finished minhashing in", (time.clock() - tim) / 60, "minutes"
-    print "Memory usage (in mb):", memory_usage_resource()
-    log.write("Memory usage (in mb):" + str(memory_usage_resource())+"\n")
+    logprint(log, False, "Finished minhashing in", (time.clock() - tim) / 60,
+                 "minutes")
+    logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
 
 
 def LSH(documents, bands, rows, shingles, k, seed, log):
@@ -665,7 +686,7 @@ def LSH(documents, bands, rows, shingles, k, seed, log):
         minhashing_mem_ef(documents, shingles, buckets, k, rows, seed, log)
 
         tim = time.clock()
-        print "Running LSH..."
+        logprint(log, False, "Running LSH...")
         for bucket in buckets:
             for i in xrange(len(buckets[bucket])):
                 doc1 = buckets[bucket][i]
@@ -678,23 +699,24 @@ def LSH(documents, bands, rows, shingles, k, seed, log):
                         if doc1.id != doc2.id + 1:
                             doc1.similarTo.add(doc2)
 
-        print "Number of buckets in band", b+1, ":", len(buckets)
+        logprint(log, False, "Number of buckets in band", b+1, ":",
+                 len(buckets))
         numPairs = 0
         for bucket in buckets:
             inBucket = buckets[bucket]
             numPairs += len(inBucket) * (len(inBucket)-1) / 2
-        print "Number of candidate pairs in band", b+1, ":", numPairs
+        logprint(log, False, "Number of candidate pairs in band", b+1, ":",
+                 numPairs)
 
-        print "Finished LSH for band", b, "in", (time.clock() - tim) / 60, \
-              "minutes"
+        logprint(log, True, "Finished LSH for band", b, "in",
+                 (time.clock() - tim) / 60, "minutes")
 
     count = 0
     for doc in documents:
         count += len(doc.similarTo)
-    print "Number of unique candidate pairs", count
+    logprint(log, False, "Number of unique candidate pairs", count)
 
-    print "Memory usage (in mb):", memory_usage_resource()
-    log.write("Memory usage (in mb):" + str(memory_usage_resource())+"\n")
+    logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
 
 
 def LSH_old(documents, bands, rows, log):
@@ -703,7 +725,7 @@ def LSH_old(documents, bands, rows, log):
     hash similar elements to the same buckets.
     """
     tim = time.clock()
-    print "Running LSH..."
+    logprint(log, False, "Running LSH...")
     index = 0
     for b in xrange(bands):
         # For each band, create a bucket array with signature as key
@@ -734,21 +756,21 @@ def LSH_old(documents, bands, rows, log):
                     # if doc1.isLeft != doc2.isLeft:
                     #     doc1.similarTo.add(doc2)
 
-        print "Number of buckets in band", b+1, ":", len(buckets)
+        logprint(log, False, "Number of buckets in band", b+1, ":",
+                 len(buckets))
         numPairs = 0
         for bucket in buckets:
             inBucket = buckets[bucket]
             numPairs += len(inBucket) * (len(inBucket)-1) / 2
-        print "Number of candidate pairs in band", b+1, ":", numPairs
+        logprint(log, False, "Number of candidate pairs in band", b+1, ":",
+                 numPairs)
 
     count = 0
     for doc in documents:
         count += len(doc.similarTo)
-    print "Number of unique candidate pairs", count
-
-    print "Finished LSH in", (time.clock() - tim) / 60, "minutes"
-    print "Memory usage (in mb):", memory_usage_resource()
-    log.write("Memory usage (in mb):" + str(memory_usage_resource())+"\n")
+    logprint(log, False, "Number of unique candidate pairs", count)
+    logprint(log, False, "Finished LSH in", (time.clock()-tim) / 60, "minutes")
+    logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
 
 
 # *************************************************************************** #
@@ -1223,8 +1245,8 @@ def main():
     totim = time.clock()
 
     # Parse command line options
-    fasta_file, k, threshold, bands, rows, sim_measure, seed, log_file \
-        = optionParse()
+    fasta_file, k, threshold, bands, rows, sim_measure, minhash_alg, \
+        seed, log_file = optionParse()
 
     # n (number of hash functions = length of minhash signatures) is implicitly
     # given
@@ -1240,34 +1262,38 @@ def main():
 
     with open(log_file, 'w') as log:
 
+        # Compute all shingles in the data set
+        shingles = computeAllShingles(fasta_file, k, log)
+
         # Read all reads from fasta file
         documents = readData(fasta_file, log)
 
         # Compute all shingles in the data set
-        shingles = shingling(documents, k, log)
+        # shingles = shingling(documents, k, log)
 
         # compareAllPairs(documents, k, sim_measure)
         # sys.exit()
 
-        #minhashingNew(documents, shingles, n, k, seed, log)
-        minhashingOld(documents, shingles, n, k, seed, log)
-        #minhashingOld2(documents, shingles, n, k, seed, log)
+        logprint(log, False, "Seed:", seed)
+        if minhash_alg == 1:
+            minhashingNew(documents, shingles, n, k, seed, log)
+        elif minhash_alg == 2:
+            minhashingOld(documents, shingles, n, k, seed, log)
+        elif minhash_alg == 3:
+            minhashingOld2(documents, shingles, n, k, seed, log)
         #minhashingOld3(documents, shingles, n, k, seed, log)
         LSH_old(documents, bands, rows, log)
         # LSH(documents, bands, rows, shingles, k, seed, log)
 
-        print "Seed:", seed
-        minhashing(documents, shingles, kmerTable, n, k, seed, log)
-        # minhashingNew(documents, shingles, n, k, seed, log)
-        # minhashingOld(documents, shingles, n, k, seed, log)
-
-
         # band_buckets = LSH_Old(documents, bands, rows)
-        LSH(documents, bands, rows, log)
+        # LSH(documents, bands, rows, log)
         # LSH_Old(documents, bands, rows)
 
-        print "Total time used for LSH:", (time.clock() - totim) / 60, "min"
+        logprint(log, True, "Total time used for LSH:",
+                 (time.clock() - totim) / 60, "minutes")
         sys.exit()
+
+
 
         output_path = ("output_" + sim_measure + "/output_k_" + str(k) + "_b_"
                        + str(bands) + "_r_" + str(rows) + "/")
@@ -1281,7 +1307,7 @@ def main():
 
         # bucketSize(band_buckets)
 
-        print "Total time used (in secs):", time.clock() - totim
+        print "Total time used:", time.clock() - totim / 60, "minutes"
 
 
 if __name__ == '__main__':
