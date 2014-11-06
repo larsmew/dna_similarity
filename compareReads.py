@@ -4,8 +4,8 @@
 # from __future__ import print_function
 
 __author__ = "Lars Andersen <larsmew@gmail.com>"
-__date__ = "11/09/2014"
-__version__ = "$Revision: 1.1"
+__date__ = "28/10/2014"
+__version__ = "$Revision: 1.2"
 
 from optparse import OptionParser
 from operator import itemgetter
@@ -15,7 +15,7 @@ import sys
 import time
 import random
 import SuperFastHash as sfh
-import mmh3
+# import mmh3
 # import os
 
 
@@ -58,6 +58,7 @@ def LSH_run(fasta_file, bands, rows, n, k, seed, minhash_alg, log):
         hashfuncs = None
         precomputeHash = True
         if precomputeHash:
+            random.seed(seed)
             hashfuncs = computeHashes(n, shingles, log)
         band_buckets = [dict() for _ in xrange(bands)]
         read_minhash(fasta_file, shingles, band_buckets, k, rows, bands, n,
@@ -114,6 +115,18 @@ def superFastHashList(shingles, n):
             salt = random.randrange(numShingles)
             hashfunc.append(sfh.SuperFastHash(shingle, salt) % numShingles)
         yield hashfunc
+
+
+def randomIndex(shingles):
+    numShingles = len(shingles)
+    free = [True for i in xrange(numShingles)]
+    for i in xrange(numShingles):
+        while True:
+            index = random.randrange(numShingles)
+            if free[index]:
+                yield index
+                free[index] = False
+                break
 
 
 def computeAllShingles(fasta_file, k, log):
@@ -259,14 +272,19 @@ def minhashing_run1(dna, idx, shingles, band_buckets, k, rows, bands, n, seed, h
         for i, h in enumerate(hashfuncs[sigPos]):
         #for i, h in enumerate(hashFuncGenerator2(shingles)):
         #for i, h in enumerate(superFastHash(shingles)):
+        #for i, h in enumerate(randomIndex(shingles)):
+        #for i, h in enumerate(permIndex(shingles)):
         # for i in xrange(len(shingles)):
         #     h = random.randrange(len(shingles))
-            #print h
+            #print h,
+            # print hashfuncs[sigPos]
             if shingles[h] in docShingles:
                 signature[sigPos] = i
                 break
-        if signature[sigPos] == None:
-            signature[sigPos] = len(shingles)
+        # if signature[sigPos] == None:
+        #     signature[sigPos] = len(shingles)
+        #     print "fail"
+        #print
 
     i = 0
     for buckets in band_buckets:
@@ -327,9 +345,9 @@ def minhashing_run3(dna, idx, shingles, band_buckets, k, rows, bands, n, seed, h
     random.seed(seed)
     signature = []
     docShingles = getDocShingles(dna, k)
-    #for h in hashfuncs:
+    for h in hashfuncs:
     #for h in hashFuncGenerator(n, shingles):
-    for h in superFastHashList(shingles, n):
+    #for h in superFastHashList(shingles, n):
         minVal = numShingles+1
         for shingle in docShingles:
             pos = shinglePos[shingle]
@@ -379,7 +397,7 @@ def LSH_band(band_buckets, log):
             numPairs += len(inBucket) * (len(inBucket)-1) / 2
         logprint(log, False, "Number of candidate pairs in band", b,
                  ":", numPairs)
-        logprint(log, True, "Number of candidate pairs in band", b,
+        logprint(log, True, "Number of unique candidate pairs in band", b,
                  ":", numPairsUnique)
 
         # print "Finished LSH for band", b, "in", (time.clock() - tim) / 60, \
@@ -1073,7 +1091,7 @@ def findSimilarPairs(documents, t, k, totim, numReads, sim_measure):
             bestMatches2.append(bestMatch2)
 
             if counter % 500000 == 0:
-                print "Processed", format(counter2, ',d'), "pairs in", \
+                print "Processed", format(counter, ',d'), "pairs in", \
                       "time:", time.clock() - timer
 
     processing_time = time.clock() - timer
