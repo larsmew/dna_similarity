@@ -142,7 +142,7 @@ def computeHashFunctions(n, shingles, log):
         random.shuffle(h)
         hashfuncs.append(h)
         # print h,"\n"
-    logprint(log, False, "Computed hashfunctions in", 
+    logprint(log, False, "Computed hashfunctions in",
              (time.clock() - tim) / 60, "minutes")
     logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
     return hashfuncs
@@ -189,7 +189,7 @@ def computeShinglesTable(fasta_file, k, log):
                     shinglesPos[shingle] = pos
                     #pos += 1
 
-        logprint(log, False, "Finished computation of shingles table in", 
+        logprint(log, False, "Finished computation of shingles table in",
                  (time.clock() - tim) / 60, "minutes")
         logprint(log, False, "Number of shingles:", len(shinglesPos))
         logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
@@ -236,6 +236,9 @@ def computeShinglesSet(fasta_file, k, log):
 
 
 def getAllReads(fasta_file, log):
+    """
+    Extract the reads (DNA sequences) from the given fasta file
+    """
     with open(fasta_file, "rU") as fasta_file:
         read = ""
         tim = time.clock()
@@ -335,7 +338,7 @@ def runLSH(fasta_file, bands, rows, n, k, seed, minhash_alg, log):
             4. First hash
             5. Through whole matrix (according to the book)
             6. Through all documents shingles
-            
+
         Type 1:
             1. First hash - pre-computed hash functions
             2. First hash - Ongoing hash function
@@ -353,18 +356,17 @@ def runLSH(fasta_file, bands, rows, n, k, seed, minhash_alg, log):
         numPairs = 0
 
         # Minhashing using pre-computed hash functions
-        if minhash_alg < 7:
-            if minhash_alg == 3 or minhash_alg == 6:
-                shingles = computeShinglesTable(fasta_file, k, log)
-            else:  # minhash alg 1 or 2
-                shingles = computeShinglesSet(fasta_file, k, log)
-            for b in xrange(bands):
-                buckets = dict()
-                minhashing(fasta_file, shingles, buckets, k, rows,
-                           minhash_alg, log)
-                lshBand(buckets, b, candidatePairs, log)
-                
-        
+        if minhash_alg == 3 or minhash_alg > 5:
+            shingles = computeShinglesTable(fasta_file, k, log)
+        else:  # minhash alg 1, 2, 4 or 5
+            shingles = computeShinglesSet(fasta_file, k, log)
+        for b in xrange(bands):
+            buckets = dict()
+            minhashing(fasta_file, shingles, buckets, k, rows,
+                       minhash_alg, b, bands, log)
+            lshBand(buckets, b, candidatePairs, log)
+
+
         # Type 1 - "First Hash"
         # if minhash_alg < 3:
         #     shingles = computeShinglesSet(fasta_file, k, log)
@@ -384,7 +386,7 @@ def runLSH(fasta_file, bands, rows, n, k, seed, minhash_alg, log):
         logprint(log, False, "Finished LSH in",
                  (time.clock() - tim) / 60, "minutes")
         logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
-        
+
         return candidatePairs
 
     else:
@@ -400,10 +402,10 @@ def getDocShingles(dna, k):
     return shingles
 
 
-def minhashing(fasta_file, shingles, buckets, k, rows, minhash_alg, log):
+def minhashing(fasta, shingles, buckets, k, rows, minhash_alg, b, bands, log):
     tim = time.clock()
     logprint(log, True, "Minhashing...")
-    
+
     # minhashAlg = { '1' : minhashing_alg1,
     #                '2' : minhashing_alg2,
     #                '3' : minhashing_alg3,
@@ -411,14 +413,16 @@ def minhashing(fasta_file, shingles, buckets, k, rows, minhash_alg, log):
     #                '5' : minhashing_alg5,
     #                '6' : minhashing_alg6,
     # }
-    
+
     idx = 0
     if minhash_alg < 4:
         hashfuncs = computeHashFunctions(rows, shingles, log)
     else:
-        p = getPrime(len(shingles))
-        seed = random.random()
-    for part in getPartsFromFile(fasta_file, log):
+        numShingles = len(shingles)
+        p = getPrime(numShingles)
+        a = [random.randrange(numShingles) for i in xrange(rows)]
+        b = [random.randrange(numShingles) for i in xrange(rows)]
+    for part in getPartsFromFile(fasta, log):
         if minhash_alg == 1:
             minhashing_alg1(part, idx, shingles, buckets, k, rows, hashfuncs)
         elif minhash_alg == 2:
@@ -426,15 +430,15 @@ def minhashing(fasta_file, shingles, buckets, k, rows, minhash_alg, log):
         elif minhash_alg == 3:
             minhashing_alg3(part, idx, shingles, buckets, k, rows, hashfuncs)
         elif minhash_alg == 4:
-            minhashing_alg4(part, idx, shingles, buckets, k, rows, p, seed)
+            minhashing_alg4(part, idx, shingles, buckets, k, rows, p, a, b)
         elif minhash_alg == 5:
-            minhashing_alg5(part, idx, shingles, buckets, k, rows, p, seed)
+            minhashing_alg5(part, idx, shingles, buckets, k, rows, p, a, b)
         else: # Default to minhash alg 6
-            minhashing_alg6(part, idx, shingles, buckets, k, rows, p, seed)
-            
+            minhashing_alg6(part, idx, shingles, buckets, k, rows, p, a, b)
+
         idx += 1
-        
-        if idx % 500000 == 0 and idx != 0:
+
+        if idx % 500000 == 0:
             logprint(log, True, "Band", b+1, "of", str(bands)+":",
                      "Processed", idx, "documents in",
                      (time.clock() - tim) / 60, "minutes")
@@ -541,7 +545,7 @@ def minhashing_alg2(dna, idx, shingles, buckets, k, rows, hashfuncs):
 
 def minhashing_alg3(dna, idx, shinglePos, buckets, k, rows, hashfuncs):
     """
-    Uses pre-computed hashFuncs and table to find original shingle position, 
+    Uses pre-computed hashFuncs and table to find original shingle position,
     then find new shingle with smallest position in hash function.
     """
     # Create minhash signatures as described in chapter 3 of the book Massive
@@ -565,25 +569,22 @@ def minhashing_alg3(dna, idx, shinglePos, buckets, k, rows, hashfuncs):
         buckets[key] = [idx]
 
 
-def minhashing_alg4(dna, idx, shingles, buckets, k, rows, p, seed):
+def minhashing_alg4(dna, idx, shingles, buckets, k, rows, p, a, b):
     """
-    Uses hash functions in the form ((a*pos+b) mod p) mod N, 
+    Uses hash functions in the form ((a*pos+b) mod p) mod N,
     where a and b random integers and p is prime and p > N.
     Uses the first hash strategy.
     """
     # Create minhash signatures as described in chapter 3 of the book Massive
     # Data Mining
     # Find signature for each document
-    random.seed(seed)
     docShingles = getDocShingles(dna, k)
     signature = []
     numShingles = len(shingles)
     # For each row in the 'character matrix'
     for sigPos in xrange(rows):
-        a = random.randrange(numShingles)
-        b = random.randrange(numShingles)
         for i in xrange(numShingles):
-            val = ((a*i+b) % p) % numShingles
+            val = ((a[sigPos]*i+b[sigPos]) % p) % numShingles
             if shingles[val] in docShingles:
                 signature.append(i)
                 break
@@ -599,32 +600,26 @@ def minhashing_alg4(dna, idx, shingles, buckets, k, rows, p, seed):
         sys.exit()
 
 
-def minhashing_alg5(dna, idx, shingles, buckets, k, rows, p, seed):
+def minhashing_alg5(dna, idx, shingles, buckets, k, rows, p, a, b):
     """
-    Uses hash functions in the form ((a*pos+b) mod p) mod N, 
+    Uses hash functions in the form ((a*pos+b) mod p) mod N,
     where a and b random integers and p is prime and p > N.
-    Runs through each hash (whole matrix) and saves smallest value which 
+    Runs through each hash (whole matrix) and saves smallest value which
     is in doc
     """
     # Create minhash signatures as described in chapter 3 of the book Massive
     # Data Mining
     # Find signature for each document
-    random.seed(seed)
     docShingles = getDocShingles(dna, k)
     signature = [None for i in xrange(rows)]
     numShingles = len(shingles)
-    ab = []
-    for i in xrange(rows):
-        a = random.randrange(numShingles)
-        b = random.randrange(numShingles)
-        ab.append((a,b))
     # For each row in the 'character matrix'
     for r in xrange(numShingles):
         # If the shingle is in the document, then
         if shingles[r] in docShingles:
             # Find the 'first' shingle relative to each permutation
             for i in xrange(rows):
-                pos = ((ab[i][0]*r+ab[i][1]) % p) % numShingles
+                pos = ((a[i]*r+b[i]) % p) % numShingles
                 if signature[i] is None or signature[i] > pos:
                     signature[i] = pos
 
@@ -635,25 +630,23 @@ def minhashing_alg5(dna, idx, shingles, buckets, k, rows, p, seed):
         buckets[key] = [idx]
 
 
-def minhashing_alg6(dna, idx, shingles, buckets, k, rows, p, seed):
+def minhashing_alg6(dna, idx, shingles, buckets, k, rows, p, a, b):
     """
-    Uses hash functions in the form ((a*pos+b) mod p) mod N, 
+    DEFAULT MINHASH ALGORITHM
+    Uses hash functions in the form ((a*pos+b) mod p) mod N,
     where a and b random integers and p is prime and p > N.
-    Computes original position of shingle by finding all shingles and 
+    Computes original position of shingle by finding all shingles and
     enumerates them, then store them in table for fast look up.
     """
     # Find signature for each document
-    random.seed(seed)
     signature = []
     docShingles = getDocShingles(dna, k)
     numShingles = len(shingles)
     for i in xrange(rows):
         minVal = numShingles+1
-        a = random.randrange(numShingles)
-        b = random.randrange(numShingles)
         for shingle in docShingles:
             pos = shingles[shingle]
-            val = ((a*pos+b) % p) % numShingles
+            val = ((a[i]*pos+b[i]) % p) % numShingles
             if val < minVal:
                 minVal = val
         signature.append(minVal)
@@ -791,7 +784,7 @@ def jaccardSim(doc1, doc2, k, sim_measure="standard"):
         return float(len(intersection)) / len(union)
 
 
-def validateJaccardSim(reads, candidatePairs, k, b, r, alg, log):    
+def validateJaccardSim(reads, candidatePairs, k, b, r, alg, log):
     """
     Method for used for obtaining information about the validity of the pairs
     found by LSH
@@ -803,7 +796,7 @@ def validateJaccardSim(reads, candidatePairs, k, b, r, alg, log):
     #           "_m"+str(alg)+"_lsh.txt", 'w')
     # f3 = open("candidate_pairs_b"+str(b)+"_r"+str(r)+"_k"+str(k)+
     #           "_m"+str(alg)+"_rest.txt", 'w')
-    
+
     # Create a mapper to look up position in array given a similarity
     n1 = len(reads[0])
     n2 = len(reads[1])
@@ -818,10 +811,10 @@ def validateJaccardSim(reads, candidatePairs, k, b, r, alg, log):
         posSimilarities[sim] = idx
     # print posSimilarities
     # print len(posSimilarities)
-    
+
     allPairs = [0 for i in xrange(len(possibleSims))]
     lshPairs = [0 for i in xrange(len(possibleSims))]
-    
+
     numReads = len(reads)
     pairNum = 0
     timer = time.clock()
@@ -836,7 +829,7 @@ def validateJaccardSim(reads, candidatePairs, k, b, r, alg, log):
             dna1 = reads[doc1]
             dna2 = reads[doc2]
             jaccard = jaccardSim(dna1, dna2, k)
-            
+
             ### Saves the similarity for each pair, and for pairs found by LSH
             # if jaccard > 0:
             #     f1.write(str(pairNum) + " " + str(jaccard) + "\n")
@@ -850,7 +843,7 @@ def validateJaccardSim(reads, candidatePairs, k, b, r, alg, log):
             #         f3.write(str(pairNum) + " " + str(jaccard) + "\n")
             #         count2 += 1
             #     pairNum += 1
-            
+
             if jaccard > 0:
                 pos = posSimilarities[jaccard]
                 if doc1 in candidatePairs:
@@ -861,13 +854,13 @@ def validateJaccardSim(reads, candidatePairs, k, b, r, alg, log):
                 pairNum += 1
             else:
                 allPairs[0] += 1
-                
-            
+
+
             process += 1
             if process % 500000 == 0:
                 logprint(log, True, "Processed", process, "pairs in time:",
                       (time.clock() - timer), "Found", pairNum, "cand. pairs")
-    
+
     f = open("s_shape_info_b"+str(b)+"_r"+str(r)+"_k"+str(k)+
              "_m"+str(alg)+"_small_581steps.txt", 'w')
     for i in xrange(len(allPairs)):
@@ -877,7 +870,7 @@ def validateJaccardSim(reads, candidatePairs, k, b, r, alg, log):
             f.write(str(lshPairs[i])+" "+str(allPairs[i])+" "+
                 str(float(lshPairs[i]) / allPairs[i])+" "+
                 str(possibleSims[i]) + "\n")
-    
+
     logprint(log, False, "Candidate pairs found by LSH:", count)
     logprint(log, False, "Number of pairs not found by LSH:", pairNum-count)
     logprint(log, True, "Total number of pairs:", pairNum)
@@ -1001,9 +994,9 @@ def main():
 
         candidatePairs = runLSH(fasta_file, bands, rows, n, k, seed,
                                 minhash_alg, log)
-
+        sys.exit()
         reads = getAllReads(fasta_file, log)
-        
+
         findSimPairs = False
         if findSimPairs:
             findSimilarPairs(reads, candidatePairs, k, bands, rorws,
