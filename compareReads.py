@@ -402,7 +402,7 @@ def getDocShingles(dna, k):
     return shingles
 
 
-def minhashing(fasta, shingles, buckets, k, rows, minhash_alg, b, bands, log):
+def minhashing(fasta, shingles, buckets, k, rows, minhash_alg, bn, bs, log):
     tim = time.clock()
     logprint(log, True, "Minhashing...")
 
@@ -439,7 +439,7 @@ def minhashing(fasta, shingles, buckets, k, rows, minhash_alg, b, bands, log):
         idx += 1
 
         if idx % 500000 == 0:
-            logprint(log, True, "Band", b+1, "of", str(bands)+":",
+            logprint(log, True, "Band", bn+1, "of", str(bs)+":",
                      "Processed", idx, "documents in",
                      (time.clock() - tim) / 60, "minutes")
 
@@ -974,6 +974,116 @@ def NeedlemanWunsch(doc1, doc2):
 
 # ************************************************************************** #
 #                                                                            #
+#                              Sequence Alignment                            #
+#                                                                            #
+# ************************************************************************** #
+def sequenceAlignment(candidatePairs, fasta_file, log):
+    reads = getAllReads(fasta_file, log)
+    for read_R in candidatePairs:
+        if read_R % 2 == 1:
+            print "id:", read_R, "cand. pairs:", len(candidatePairs[read_R])
+            read_Ls = list(candidatePairs[read_R])
+            read_Ls.append(read_R)
+            read_Ls.sort()
+            
+            #sequences = getSequences(fasta_file, read_Ls, log)
+            sequences = [reads[i] for i in read_Ls]
+            
+            # print read_Ls
+            # print sequences
+
+            for i in xrange(1, len(sequences)):
+                offset = findAlignment(sequences[0], sequences[i], 0, log)
+            #sys.exit()
+
+def getSequences(fasta_file, ids, log):
+    """
+    Extract the reads (DNA sequences) from the given fasta file
+    """
+    with open(fasta_file, "rU") as fasta_file:
+        read = ""
+        tim = time.clock()
+        #logprint(log, False, "Collecting sequences...")
+        reads = []
+        seqs = 0
+        id = 0
+        idx = 0
+        for line in fasta_file:
+            # If line starts with ">", which indicates end of a sequence, append it to list of reads
+            if line.startswith(">"):
+                if read != "":
+                    # Splits the string into two parts
+                    if idx == ids[id]:
+                        leftpart = read[:len(read)/2]
+                        reads.append(leftpart)
+                        seqs += 1
+                        id += 1
+                        if id == len(ids):
+                            read = ""
+                            break
+                    idx += 1
+                    if idx == ids[id]:
+                        rightpart = read[len(read)/2:]
+                        reads.append(rightpart)
+                        seqs += 1
+                        id += 1
+                        if id == len(ids):
+                            read = ""
+                            break
+                    idx += 1
+                    read = ""
+            # Concatenate multi-line sequences into one string
+            else:
+                read += line.strip().upper()
+        if read != "":
+            if idx == ids[id]:
+                leftpart = read[:len(read)/2]
+                reads.append(leftpart)
+                seqs += 1
+                id += 1
+            idx += 1
+            
+            if id != len(ids) and idx == ids[id]:
+                rightpart = read[len(read)/2:]
+                reads.append(rightpart)
+                seqs += 1
+
+        # logprint(log, False, "Finished reading in",
+        #          (time.clock() - tim) / 60, "minutes")
+        # logprint(log, False, "Found", seqs, "sequences in fasta file")
+        # logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
+        return reads
+
+
+def findAlignment(read_R, read_L, allowed_mismatches, log):
+    offset = 0
+    doPrint = True
+    if len(read_R) > len(read_L):
+        offset = len(read_R) - len(read_L)
+    lengthToCompare = len(read_L)
+    while lengthToCompare > 10:
+        mismatches = 0
+        for i in xrange(lengthToCompare):
+            if read_R[i+offset] != read_L[i]:
+                mismatches += 1
+                if mismatches > allowed_mismatches:
+                    break
+        if mismatches <= allowed_mismatches:
+            if doPrint:
+                print "offset:", offset
+                print read_R
+                if offset == 0:
+                    print read_L
+                else:
+                    print " "*(offset-1), read_L
+            return offset
+        offset += 1
+        lengthToCompare -= 1
+    return -1
+
+
+# ************************************************************************** #
+#                                                                            #
 #                                     Main                                   #
 #                                                                            #
 # ************************************************************************** #
@@ -994,6 +1104,7 @@ def main():
 
         candidatePairs = runLSH(fasta_file, bands, rows, n, k, seed,
                                 minhash_alg, log)
+        sequenceAlignment(candidatePairs, fasta_file, log)
         sys.exit()
         reads = getAllReads(fasta_file, log)
 
