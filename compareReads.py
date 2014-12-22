@@ -999,24 +999,29 @@ def sequenceAlignment(candidatePairs, fasta_file, log):
         #if read_R == 275:
 
             # Align left parts
-            alignLeftParts(read_R, seqs, alignedLeftGroups, alignMatrix, 
+            alignLeftParts(read_R, seqs, alignedLeftGroups, alignMatrix,
                            candidatePairs, log)
-            
+
             # Align right parts
             newOffset = alignRightParts(read_R, seqs, alignedLeftGroups,
                                         alignedRightGroups, alignMatrix,
                                         candidatePairs, log)
-            
-            logprint(log, False, " "*(abs(newOffset)), seqs[read_R])
+
+            logprint(log, False, "\n", " "*(abs(newOffset)), seqs[read_R-1]+" "+seqs[read_R])
             for group in alignedLeftGroups[read_R]:
                 for read_L in group:
-                    logprint(log, False, " " * (abs(newOffset) + 
-                             alignMatrix[read_L]),
-                             seqs[read_L]+seqs[read_L+1])
+                    if read_L % 2 == 0:
+                        logprint(log, False, " " * (abs(newOffset) + 2 +
+                             alignMatrix[read_L] + len(seqs[read_R-1])),
+                             seqs[read_L]+" "+seqs[read_L+1])
+                    else:
+                        logprint(log, False, " " * (abs(newOffset) +
+                             alignMatrix[read_L] + 1),
+                             seqs[read_L-1]+" "+seqs[read_L])
                 logprint(log, False, sorted(list(group)))
                 logprint(log, False, len(group), "\n")
-                logprint(log, False, " "*(abs(newOffset)), seqs[read_R-1]+ 
-                                     " "+seqs[read_R])
+            logprint(log, False, " "*(abs(newOffset)), seqs[read_R-1]+
+                                 " "+seqs[read_R])
             for group in alignedRightGroups[read_R]:
                 for read_R in group:
                     logprint(log, False, " " * (abs(newOffset) +
@@ -1024,13 +1029,15 @@ def sequenceAlignment(candidatePairs, fasta_file, log):
                              " "+seqs[read_R])
                 logprint(log, False, sorted(list(group)))
                 logprint(log, False, len(group))
-            
-            sys.exit()
-            
+
+            #sys.exit()
+
             proc += 1
             if proc % 500000 == 0:
-                logprint(log, True, "Processed", proc, "of", numParts, 
+                logprint(log, True, "Processed", proc, "of", numParts,
                          "right parts in", (time.clock()-tim) / 60, "minutes")
+
+    logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
 
 
 def getSequences(fasta_file, ids, log):
@@ -1079,7 +1086,7 @@ def getSequences(fasta_file, ids, log):
                 seqs += 1
                 id += 1
             idx += 1
-            
+
             if id != len(ids) and idx == ids[id]:
                 rightpart = read[len(read)/2:]
                 reads.append(rightpart)
@@ -1103,14 +1110,14 @@ def alignLeftParts(read_R, seqs, leftGroups, alignMatrix, candidatePairs, log):
             else:
                 newGroup = True
                 for group in leftGroups[read_R]:
-                    if fitsInGroup(group, seqs, read_R, read_L, 
+                    if fitsInGroup(group, seqs, read_R, read_L,
                                    alignMatrix, 0):
                         group.add(read_L)
                         newGroup = False
                         #break
                 if newGroup:
                     leftGroups[read_R].append(set([read_L]))
-    
+
     # if len(alignedGroups[read_R]) > 1:
     #     print "id", read_R, "cand. pairs", len(candidatePairs[read_R])
     #     for group in alignedGroups[read_R]:
@@ -1181,7 +1188,7 @@ def alignRightParts(read_R, seqs, leftGroups, rightGroups, alignMatrix, candidat
     for group in leftGroups[read_R]:
         #rightPartsLeft = set()
         #rightPartsRight = set()
-        for read_L in group:
+        for read_L in group.copy():
             for next_read_R in candidatePairs[read_L]:
                 if read_R != next_read_R and \
                              next_read_R not in alignMatrix:
@@ -1193,23 +1200,34 @@ def alignRightParts(read_R, seqs, leftGroups, rightGroups, alignMatrix, candidat
                             newOffset = offset
                         alignMatrix[next_read_R] = offset
                         if offset > 0:
-                            None
+                            if len(leftGroups[read_R]) == 0:
+                                leftGroups[read_R].append(set([next_read_R]))
+                            else:
+                                newGroup = True
+                                for group in leftGroups[read_R]:
+                                    if fitsInLeftGroup(group, seqs,
+                                       read_R, next_read_R, alignMatrix, 0):
+                                           group.add(next_read_R)
+                                           newGroup = False
+                                           #break
+                                if newGroup:
+                                    leftGroups[read_R].\
+                                    append(set([next_read_R]))
                         elif offset < 0:
-                            None
-                            # if len(rightGroups[read_R]) == 0:
-                            #     rightGroups[read_R].append(set([next_read_R]))
-                            # else:
-                            #     newGroup = True
-                            #     for group in rightGroups[read_R]:
-                            #         if fitsInRightGroup(group, seqs,
-                            #            read_R, next_read_R, alignMatrix, 0):
-                            #                group.add(next_read_R)
-                            #                newGroup = False
-                            #                #break
-                            #     if newGroup:
-                            #         rightGroups[read_R].\
-                            #         append(set([next_read_R]))
-                                
+                            if len(rightGroups[read_R]) == 0:
+                                rightGroups[read_R].append(set([next_read_R]))
+                            else:
+                                newGroup = True
+                                for group in rightGroups[read_R]:
+                                    if fitsInRightGroup(group, seqs,
+                                       read_R, next_read_R, alignMatrix, 0):
+                                           group.add(next_read_R)
+                                           newGroup = False
+                                           #break
+                                if newGroup:
+                                    rightGroups[read_R].\
+                                    append(set([next_read_R]))
+
                             # elif fitsInRightGroup(rightPartsLeft, seqs,
                             #         read_R, next_read_R, alignMatrix, 0):
                             #     rightGroup.add(next_read_R)
@@ -1217,8 +1235,8 @@ def alignRightParts(read_R, seqs, leftGroups, rightGroups, alignMatrix, candidat
                             #     print logprint(log, False, " "*(abs(offset)),
                             #                    seqs[read_R])
                             #     print logprint(log, False, seqs[read_R])
-                        
-                        
+
+
                         # print alignMatrix[read_L]
                         # print offset
                         # if alignMatrix[read_L] > offset:
@@ -1231,27 +1249,40 @@ def alignRightParts(read_R, seqs, leftGroups, rightGroups, alignMatrix, candidat
                         #     print " "*(newOffset-1), seqs[read_R]
                         #     print seqs[next_read_R]
                         #     print " "*(offset-1), seqs[read_L]
-                        
+
     return newOffset
 
-def fitsInLeftGroup(group, seqs, read_R, read_L, alignMatrix, al_mismatches):
-    # if group == []:
-    #     return False
-    lread_R = seqs[read_R]
-    lread_L = seqs[read_L]+seqs[read_L+1]
-    #offset1 = alignmentMatrix[read_R][read_L]
-    offset1 = alignMatrix[read_L]
+def fitsInLeftGroup(group, seqs, read_R, next_read_R, alignMatrix, m2):
+    lread_R = seqs[read_R-1]+seqs[read_R]
+    lread_L = seqs[next_read_R-1]+seqs[next_read_R]
+    offset1 = alignMatrix[next_read_R]
     extraPart1 = len(lread_L)-len(lread_R)+offset1
     for read in group:
-        #offset2 = alignmentMatrix[read_R][read]
-        lread = seqs[read]+seqs[read+1]
-        offset2 = alignMatrix[read]
+        if read % 2 == 0:
+            lread = seqs[read]+seqs[read+1]
+            offset2 = alignMatrix[read]+len(seqs[read_R-1])
+        else:
+            lread = seqs[read-1]+seqs[read]
+            offset2 = alignMatrix[read]
         extraPart2 = len(lread)-len(lread_R)+offset2
+        
+        # print read_R, next_read_R, read
+        # print read_R-1, next_read_R-1, read-1
+        # print offset1, offset2
+        # print seqs[read_R-1]+" "+seqs[read_R]
+        # print " "*(offset1-1), seqs[next_read_R-1]+" "+seqs[next_read_R]
+        # if read % 2 == 0:
+        #     print " "*(offset2), seqs[read]+" "+seqs[read+1]
+        # else:
+        #     print " "*(offset2-1), seqs[read-1]+" "+seqs[read]
+        #sys.exit()
+        
         mismatches = 0
         for i in xrange(min(extraPart1, extraPart2)):
             if lread_L[i+len(lread_R)-offset1] != lread[i+len(lread_R)-offset2]:
                 mismatches += 1
-                if mismatches > al_mismatches:
+                if mismatches > m2:
+                    print "lol"
                     return False
     return True
 
@@ -1260,23 +1291,31 @@ def fitsInRightGroup(group, seqs, read_R, next_read_R, alignMatrix, m2):
     for read in group:
         extraPart = min(abs(alignMatrix[read]), abs(alignMatrix[next_read_R]))
         offset = alignMatrix[read] - alignMatrix[next_read_R]
-        
-        offset1 = 0
-        offset2 = 0
+
+        offset1 = 0 # next_read_R
+        offset2 = 0 # read
         if offset > 0:
             offset1 = offset
         elif offset < 0:
             offset2 = abs(offset)
-        
-        print read_R, next_read_R, read
-        print read_R-1, next_read_R-1, read-1
-        print offset1, offset2
-        padding = max(abs(alignMatrix[read]), abs(alignMatrix[next_read_R]))
-        print " "*(padding), seqs[read_R-1]+" "+seqs[read_R]
-        print " "*(offset2), seqs[next_read_R-1]+" "+seqs[next_read_R]
-        print " "*(offset1), seqs[read-1]+" "+seqs[read]
-        sys.exit()
-        
+
+        # print read_R, next_read_R, read
+        # print read_R-1, next_read_R-1, read-1
+        # print offset1, offset2
+        # padding = max(abs(alignMatrix[read]), abs(alignMatrix[next_read_R]))
+        # print " "*(padding), seqs[read_R-1]+" "+seqs[read_R]
+        # print " "*(offset2), seqs[next_read_R-1]+" "+seqs[next_read_R]
+        # print " "*(offset1), seqs[read-1]+" "+seqs[read]
+        mismatches = 0
+        seqRead = seqs[read-1]+seqs[read]
+        seqNextRead = seqs[next_read_R-1]+seqs[next_read_R]
+        for i in xrange(extraPart):
+            if seqNextRead[i+offset1] != seqRead[i+offset2]:
+                mismatches += 1
+                if mismatches > m2:
+                    return False
+    return True
+
 
 # GTCAA AGTTCAG
 #          TCAGAA TGCCC
@@ -1304,15 +1343,15 @@ def main():
 
         candidatePairs = runLSH(fasta_file, bands, rows, n, k, seed,
                                 minhash_alg, log)
-        
+
         tim = time.clock()
         sequenceAlignment(candidatePairs, fasta_file, log)
-        logprint(log, False, "Finished sequence alignment", 
+        logprint(log, False, "Finished sequence alignment",
                  (time.clock() - tim) / 60, "minutes")
-        
+
         logprint(log, True, "Total time used:", (time.clock() - totim) / 60,
                  "minutes")
-        
+
         sys.exit()
         reads = getAllReads(fasta_file, log)
 
