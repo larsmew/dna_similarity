@@ -11,7 +11,13 @@ from collections import Counter
 import sys
 import time
 import random
+import json
+import cPickle as pickle
+import csv
 
+
+c1 = 0
+c2 = 0
 
 # ************************************************************************** #
 #                                                                            #
@@ -34,6 +40,32 @@ def optionParse():
                       action="store",
                       dest="fasta_file",
                       help="set <FILENAME> as fasta file.")
+
+    parser.add_option("-i", "--candidate_pairs",
+                      metavar="<FILENAME>",
+                      type=str,
+                      action="store",
+                      dest="input",
+                      help="set <FILENAME> as input file containing \
+                            candidate pairs to import.")
+
+    parser.add_option("-e", "--export_candidate_pairs",
+                      metavar="<FILENAME>",
+                      type=str,
+                      action="store",
+                      dest="output",
+                      help="set <FILENAME> as output file to export \
+                            candidate pairs to. Dump as either txt, json, \
+                            pickle or csv file. Just put the right extension\
+                            and everything else is automated.")
+
+    parser.add_option("-l", "--log_file",
+                      metavar="<FILENAME>",
+                      type=str,
+                      default="log.txt",
+                      action="store",
+                      dest="log",
+                      help="set <FILENAME> as log file.")
 
     parser.add_option("-k", "--k_size",
                       metavar="<VALUE>",
@@ -81,7 +113,7 @@ def optionParse():
                       default="6",
                       action="store",
                       dest="m",
-                      help="<VALUE> defines the minhash algorithm used.")
+                      help="<VALUE> defines the minhash algorithm to use.")
 
     parser.add_option("-s", "--seed",
                       metavar="<VALUE>",
@@ -90,19 +122,11 @@ def optionParse():
                       dest="s",
                       help="set <VALUE> as seed for hash functions.")
 
-    parser.add_option("-l", "--log_file",
-                      metavar="<VALUE>",
-                      type=str,
-                      default="log.txt",
-                      action="store",
-                      dest="log",
-                      help="set <VALUE> as seed for hash functions.")
-
     (options, args) = parser.parse_args()
 
     return options.fasta_file, options.k, options.threshold,\
         options.bands, options.rows, options.sim, options.m, \
-        options.s, options.log
+        options.s, options.log, options.input, options.output
 
 
 def memory_usage_resource():
@@ -120,13 +144,168 @@ def logprint(log_file, flush, *output):
     Prints to standard out and to log file
     """
     log_output = ""
-    for element in output:
-        log_output += str(element) + " "
+    #for element in output:
+    #    log_output += str(element) + " "
+    log_output = " ".join(map(str, output))
     print log_output
     log_output += "\n"
     log_file.write(log_output)
     if flush:
         log_file.flush()
+
+
+def exportCandidatePairs(candidatePairs, output_file, log):
+    """
+    Export candidate pairs to file. 
+    The type of file is determined 
+    """
+    tim = time.clock()
+    # Output file extension
+    ext = output_file.rsplit(".", 1)
+    # default to txt if no extension provided
+    if len(ext) == 0:
+        ext = "txt"
+        output_file += ".txt"
+    else:
+        ext = ext[1]
+
+    # save set information - However, more space consuming
+    # and not needed. Hence, this should never be used.
+    if ext == "_set.pickle":
+        with open(output_file, "w") as f:
+            pickle.dump(candidatePairs, f)
+
+    elif ext == "json":
+        with open(output_file, "w") as f:
+            if isinstance(candidatePairs[0], set):
+                for id1 in candidatePairs:
+                    candidatePairs[id1] = list(candidatePairs[id1])
+            json.dump(candidatePairs, f)
+
+    elif ext == "pickle":
+        with open(output_file, "w") as f:
+            if isinstance(candidatePairs[0], set):
+                for id1 in candidatePairs:
+                    candidatePairs[id1] = list(candidatePairs[id1])
+            pickle.dump(candidatePairs, f)
+
+    elif ext == "txt":
+        with open(output_file, "w") as f:
+            for id1 in candidatePairs:
+                f.write(str(id1)+"\t")
+                sortedElements = sorted(list(candidatePairs[id1]))
+                for id2 in sortedElements[:-1]:
+                    f.write(str(id2)+",")
+                f.write(str(sortedElements[-1])+"\n")
+
+    elif ext == "txt2":
+        with open(output_file, "w") as f:
+            for id1 in candidatePairs:
+                for id2 in candidatePairs[id1]:
+                    f.write(str(id1)+"\t"+str(id2)+"\n")
+
+    elif ext == "csv":
+        w = csv.writer(open(output_file+".csv", "w"))
+        for key, val in candidatePairs.items():
+            w.writerow([key, val])
+    
+    # Else export to whatever filename that is provided in the format
+    # used for txt files.
+    else:
+        output_file += ".txt"
+        with open(output_file, "w") as f:
+            for id1 in candidatePairs:
+                f.write(str(id1)+"\t")
+                sortedElements = sorted(list(candidatePairs[id1]))
+                for id2 in sortedElements[:-1]:
+                    f.write(str(id2)+",")
+                f.write(str(sortedElements[-1])+"\n")
+        
+    logprint(log, False, "Exported candidate pairs to", output_file,
+             "in", time.clock()-tim, "seconds")
+
+
+def importCandidatePairs(input_file, log):
+    tim = time.clock()
+    candidatePairs = dict()
+    # Input file extension
+    ext = input_file.rsplit(".", 1)
+    if len(ext) == 0:
+        ext = "txt"
+        input_file += ".txt"
+    else:
+        ext = ext[1]
+
+    if ext == "_set.pickle":
+        with open(input_file+ext, "r") as f:
+            candidatePairs = pickle.load(f)
+        logprint(log, False, "pickle-set:", time.clock()-tim)
+
+    elif ext == ".json":
+        with open(input_file+ext, "r") as f:
+            candidatePairs = json.load(f)
+        logprint(log, False, "json:", time.clock()-tim)
+        for id1 in candidatePairs:
+            print id1
+            print candidatePairs[id1]
+        sys.exit()
+
+    elif ext == ".pickle":
+        with open(input_file+ext, "r") as f:
+            candidatePairs = pickle.load(f)
+        logprint(log, False, "pickle-list:", time.clock()-tim)
+
+    elif ext == "txt":
+        with open(input_file, "r") as f:
+            for line in f:
+                elements = line.split()
+                key = int(elements[0])
+                pairs = map(int, elements[1].split(','))
+                candidatePairs[key] = pairs
+                # print elements
+                # print key
+                # print pairs
+                # print candidatePairs[key]
+                # sys.exit()
+        logprint(log, False, "txt file:", time.clock()-tim)
+        # for id1 in candidatePairs:
+        #     print id1
+        #     print candidatePairs[id1]
+        # sys.exit()
+
+    elif ext == "2.txt":
+        with open(input_file+ext, "r") as f:
+            for line in f:
+                elements = map(int, line.split())
+                if elements[0] in candidatePairs:
+                    candidatePairs[elements[0]].append(elements[1])
+                else:
+                    candidatePairs[elements[0]] = [elements[1]]
+        logprint(log, False, "txt2 file:", time.clock()-tim)
+
+    elif ext == ".csv":
+        for key, val in csv.reader(open(input_file+ext)):
+            if key in candidatePairs:
+                candidatePairs[key].append(val)
+            else:
+                candidatePairs[key] = [val]
+        logprint(log, False, "csv:", time.clock()-tim)
+        
+    else:
+        logprint(log, True, "File format is not supported for input file."
+                 "Please specify file format (extension) as either txt,",
+                 "json, pickle or csv.")
+        sys.exit()
+
+    for id1 in candidatePairs:
+        print id1
+        print candidatePairs[id1]
+        #sys.exit()
+
+    logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
+    #sys.exit()
+    return candidatePairs
+
 
 # ************************************************************************** #
 #                                                                            #
@@ -272,6 +451,7 @@ def getAllReads(fasta_file, log):
         logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
         return reads
 
+
 def getPartsFromFile(fasta_file, log):
     with open(fasta_file, "rU") as fasta_file:
         read = ""
@@ -293,7 +473,6 @@ def getPartsFromFile(fasta_file, log):
             yield leftpart
             rightpart = read[len(read)/2:]
             yield rightpart
-
 
 
 def isPrime(n):
@@ -353,8 +532,7 @@ def runLSH(fasta_file, bands, rows, n, k, seed, minhash_alg, log):
         tim = time.clock()
         random.seed(seed)
         candidatePairs = dict()
-        numPairs = 0
-
+        
         # Minhashing using pre-computed hash functions
         if minhash_alg == 3 or minhash_alg > 5:
             shingles = computeShinglesTable(fasta_file, k, log)
@@ -365,6 +543,10 @@ def runLSH(fasta_file, bands, rows, n, k, seed, minhash_alg, log):
             minhashing(fasta_file, shingles, buckets, k, rows,
                        minhash_alg, b, bands, log)
             lshBand(buckets, b, candidatePairs, log)
+
+        # Convert sets to lists for memory effciency
+        # for id1 in candidatePairs:
+        #     candidatePairs[id1] = list(candidatePairs[id1])
 
 
         # Type 1 - "First Hash"
@@ -380,9 +562,8 @@ def runLSH(fasta_file, bands, rows, n, k, seed, minhash_alg, log):
         #             idx += 1
         #         lshBand(buckets, b, candidatePairs, log)
 
-
         logprint(log, False, "\nNumber of unique candidate pairs",
-                 sum(len(candidatePairs[i]) for i in candidatePairs))
+                 sum(len(candidatePairs[i]) for i in candidatePairs)/2)
         logprint(log, False, "Finished LSH in",
                  (time.clock() - tim) / 60, "minutes")
         logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
@@ -433,7 +614,7 @@ def minhashing(fasta, shingles, buckets, k, rows, minhash_alg, bn, bs, log):
             minhashing_alg4(part, idx, shingles, buckets, k, rows, p, a, b)
         elif minhash_alg == 5:
             minhashing_alg5(part, idx, shingles, buckets, k, rows, p, a, b)
-        else: # Default to minhash alg 6
+        else:  # Default to minhash alg 6
             minhashing_alg6(part, idx, shingles, buckets, k, rows, p, a, b)
 
         idx += 1
@@ -481,20 +662,20 @@ def lshBand(buckets, b, candidatePairs, log):
                             candidatePairs[id2] = set([id1])
                         numPairsUnique += 1
 
-    logprint(log, True, "Number of buckets in band", b, ":", len(buckets))
+    logprint(log, True, "Number of buckets in band", str(b)+":", len(buckets))
     numPairs = 0
     for bucket in buckets:
         inBucket = buckets[bucket]
         numPairs += len(inBucket) * (len(inBucket)-1) / 2
-    logprint(log, False, "Number of candidate pairs in band", b,
-             ":", numPairs)
-    logprint(log, True, "Number of unique candidate pairs in band", b,
-             ":", numPairsUnique)
+    logprint(log, False, "Number of candidate pairs in band", str(b)+":",
+             numPairs)
+    logprint(log, True, "Number of unique candidate pairs in band",
+             str(b)+":", numPairsUnique)
 
         # print "Finished LSH for band", b, "in", (time.clock() - tim) / 60, \
         #       "minutes"
-
-    return candidatePairs
+    
+    return None
 
 
 # ************************************************************************** #
@@ -644,7 +825,8 @@ def minhashing_alg6(dna, idx, shingles, buckets, k, rows, p, a, b):
     Uses hash functions in the form ((a*pos+b) mod p) mod N,
     where a and b random integers and p is prime and p > N.
     Computes original position of shingle by finding all shingles and
-    enumerates them, then store them in table for fast look up.
+    enumerates them, then store them in a table for fast look up.
+    Tale is called shingles.
     """
     # Find signature for each document
     signature = []
@@ -988,7 +1170,7 @@ def NeedlemanWunsch(doc1, doc2):
 class AlignedGroup(object):
     """
     Defines the data structure of a document. Like dna sequence, id, left or
-    right part of string, shingles related to the string, the minhash 
+    right part of string, shingles related to the string, the minhash
     signature
     """
     #consensusMain = 0  # read_R
@@ -1009,7 +1191,6 @@ class AlignedGroup(object):
 
 
 def sequenceAlignment(candidatePairs, fasta_file, log):
-    tim = time.clock()
     seqs = getAllReads(fasta_file, log)
     #alignMatrix = dict()
     alignedGroups = dict()
@@ -1018,23 +1199,24 @@ def sequenceAlignment(candidatePairs, fasta_file, log):
     numParts = len(candidatePairs) / 2
     proc = 0
     newOffset = 0
+    tim = time.clock()
     for read_R in candidatePairs:
         if read_R % 2 == 1:
         #if read_R == 275:
             consensus = []
-            
+
             # Align left parts
             alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log)
 
             # Align right parts
             alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log)
-            
-            
+
+
             if doPrint:
                 for group in alignedGroups[read_R]:
                     logprint(log, False, "\n Consensus:")
                     logprint(log, False, group.consensusLeft,
-                             seqs[read_R-1]+" "+seqs[read_R], 
+                             seqs[read_R-1]+" "+seqs[read_R],
                              group.consensusRight)
                     newOffset = len(group.consensusLeft) + len(seqs[read_R-1])
                     for read_L in group.leftParts:
@@ -1043,13 +1225,23 @@ def sequenceAlignment(candidatePairs, fasta_file, log):
                                  offset), seqs[read_L]+" "+seqs[read_L+1])
                     #logprint(log, False, list(group.leftParts))
                     #logprint(log, False, sorted(list(group.leftParts)))
-                    #logprint(log, False, sorted([i[0] for i in group.leftParts]))
-                    for next_read_R in group.rightParts:
-                        for offset in group.rightParts[next_read_R]:
-                            logprint(log, False, " " * (len(group.consensusLeft) +
-                                 offset), seqs[next_read_R-1]+" "+seqs[next_read_R])
+                    logprint(log, False, sorted([i[0] for i in
+                             group.leftParts]))
+                    for read_R2 in group.rightParts:
+                        for offset in group.rightParts[read_R2]:
+                            logprint(log, False, " " * offset +
+                                     (len(group.consensusLeft)),
+                                     seqs[read_R2-1]+" "+seqs[read_R2])
                     logprint(log, False, len(group.leftParts))
                     logprint(log, False, len(group.rightParts), "\n")
+
+            # logprint(log, True, "read_R:", read_R)
+            # for group in alignedGroups[read_R]:
+            #     totalSize = len(group.leftParts) + len(group.rightParts)
+            #     if totalSize > 9:
+            #         logprint(log, False, "Total reads:", totalSize)
+            #         logprint(log, False, len(group.leftParts))
+            #         logprint(log, False, len(group.rightParts), "\n")
 
             #sys.exit()
 
@@ -1061,6 +1253,8 @@ def sequenceAlignment(candidatePairs, fasta_file, log):
     logprint(log, False, "Finished sequence alignment",
              (time.clock() - tim) / 60, "minutes")
     logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
+    logprint(log, False, "c1:", c1)
+    logprint(log, False, "c2:", c2)
 
 
 def getSequences(fasta_file, ids, log):
@@ -1142,7 +1336,7 @@ def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log):
                 start = len(seqs[read_R]) - offset
                 group.consensusRight = seqs[read_L][start:] + seqs[read_L+1]
                 group.leftParts[read_L] = [offset]
-                
+
                 # lread_R = seqs[read_R]
                 # lread_L = seqs[read_L]
                 # print "", lread_R
@@ -1208,7 +1402,7 @@ def fitsInGroup(group, seqs, read_R, read_L, offset, m2):
 
 
 def fitsInGroup2(group, seqs, read_R, next_read_R, offset, offset2, m2):
-    ### Check extra part at the right side, however is checked by 
+    ### Check extra part at the right side, however is checked by
     ### findAlignment already, so probably not needed
     lread_R = seqs[read_R]
     lread_R2 = seqs[next_read_R]
@@ -1219,7 +1413,7 @@ def fitsInGroup2(group, seqs, read_R, next_read_R, offset, offset2, m2):
             mismatches += 1
             if mismatches > m2:
                 return False
-                
+
     ### Check extra part at the left side, first for anchor point
     lread_R = seqs[read_R]
     lread_R_l = seqs[read_R-1]
@@ -1235,7 +1429,7 @@ def fitsInGroup2(group, seqs, read_R, next_read_R, offset, offset2, m2):
             mismatches += 1
             if mismatches > m2:
                 return False
-    
+
     ### Check extra part at the left side, then for left part of anchor point
     # print "", lread_R_l
     # print " "*offset, lread_R2
@@ -1246,7 +1440,7 @@ def fitsInGroup2(group, seqs, read_R, next_read_R, offset, offset2, m2):
             mismatches += 1
             if mismatches > m2:
                 return False
-    
+
     return True
 
 
@@ -1256,11 +1450,11 @@ def fitsInGroup3(group, seqs, read_R, next_read_R, offset, offset2, m2):
     lread_R_l = seqs[read_R-1]
     lread_R2 = seqs[next_read_R-1]+seqs[next_read_R]
     offsetPos = abs(offset)
-    
+
     # print " "*(len(lread_R_l)+offsetPos), lread_R
     # print " "*offsetPos, lread_R_l
     # print "", seqs[next_read_R-1]+" "+seqs[next_read_R]
-    
+
     mismatches = 0
     for i in xrange(offset2):
         # print lread_R2[i+len(seqs[next_read_R-1])+offsetPos]
@@ -1269,7 +1463,7 @@ def fitsInGroup3(group, seqs, read_R, next_read_R, offset, offset2, m2):
             mismatches += 1
             if mismatches > m2:
                 return False
-    
+
     for i in xrange(len(lread_R_l)):
         # print lread_R2[i+offsetPos]
         # print lread_R_l[i]
@@ -1293,13 +1487,15 @@ def fitsInGroup3(group, seqs, read_R, next_read_R, offset, offset2, m2):
                 if mismatches > m2:
                     if doPrint:
                         print "ALIGNS NICELY UNTIL PRE-PART! - preOffset bigger"
-                        print " "*preOffset, group.consensusLeft+seqs[read_R-1]+seqs[read_R]+group.consensusRight 
+                        print " "*preOffset, group.consensusLeft+seqs[read_R-1]+seqs[read_R]+group.consensusRight
                         print "", lread_R2
                     #sys.exit()
+                    global c1
+                    c1 += 1
                     return False
-        
+
         group.consensusLeft = lread_R2[:offsetPos]
-        
+
     else:
         preOffset = len(group.consensusLeft) - offsetPos
         for i in xrange(offsetPos):
@@ -1310,9 +1506,11 @@ def fitsInGroup3(group, seqs, read_R, next_read_R, offset, offset2, m2):
                 if mismatches > m2:
                     if doPrint:
                         print "ALIGNS NICELY UNTIL PRE-PART! - groupOffset bigger"
-                        print "", group.consensusLeft+seqs[read_R-1]+seqs[read_R]+group.consensusRight 
+                        print "", group.consensusLeft+seqs[read_R-1]+seqs[read_R]+group.consensusRight
                         print " "*preOffset, lread_R2
                     #sys.exit()
+                    global c2
+                    c2 += 1
                     return False
     return True
 
@@ -1328,15 +1526,15 @@ def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
                         for offset2 in group.leftParts[read_L]:
                             offset = offset2 - offset1
                             if offset > 0:
-                                
+
                                 if fitsInGroup2(group, seqs, read_R, next_read_R, offset, offset2, 0):
                                     if next_read_R in group.rightParts:
                                         group.rightParts[next_read_R].append(offset)
                                     else:
                                         group.rightParts[next_read_R] = [offset]
-                                        
+
                             elif offset < 0:
-                                
+
                                 if fitsInGroup3(group, seqs, read_R, next_read_R, offset, offset2, 0):
                                     if next_read_R in group.rightParts:
                                         group.rightParts[next_read_R].append(offset)
@@ -1361,15 +1559,26 @@ def main():
 
     # Parse command line options
     fasta_file, k, threshold, bands, rows, sim_measure, minhash_alg, \
-        seed, log_file = optionParse()
+        seed, log_file, input_file, output_file = optionParse()
+
+    # Temp paramters
+    # input_file = "candidate_pairs_k_16_b_2_r_5_m_6"
+    # input_file = "candidate_pairs_k_16_b_1_r_32_m_6"
 
     # n (number of hash functions = length of minhash signature) is given by
     n = bands * rows
 
     with open(log_file, 'w') as log:
 
-        candidatePairs = runLSH(fasta_file, bands, rows, n, k, seed,
-                                minhash_alg, log)
+        if input_file:
+            candidatePairs = importCandidatePairs(input_file, log)
+        else:
+            candidatePairs = runLSH(fasta_file, bands, rows, n, k, seed,
+                                    minhash_alg, log)
+        if output_file:
+            output = "candidate_pairs_k_"+str(k)+"_b_"+str(bands)+"_r_"+ \
+                     str(rows)+"_m_"+str(minhash_alg)
+            exportCandidatePairs(candidatePairs, output_file, log)
 
         sequenceAlignment(candidatePairs, fasta_file, log)
 
