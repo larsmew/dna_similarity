@@ -130,6 +130,10 @@ def optionParse():
 
 
 def memory_usage_resource():
+    """
+    Computes the ressource usage at a given time during runtime.
+    Computes total amount used so far, so not the amount currently in use.
+    """
     import resource
     rusage_denom = 1024.
     if sys.platform == 'darwin':
@@ -156,8 +160,9 @@ def logprint(log_file, flush, *output):
 
 def exportCandidatePairs(candidatePairs, output_file, log):
     """
-    Export candidate pairs to file. 
-    The type of file is determined 
+    Export candidate pairs to a file.
+    The type of file is determined on the provided filename for output_file.
+    Supported filetypes: txt, json, pickle (python) and csv.
     """
     tim = time.clock()
     # Output file extension
@@ -208,7 +213,7 @@ def exportCandidatePairs(candidatePairs, output_file, log):
         w = csv.writer(open(output_file+".csv", "w"))
         for key, val in candidatePairs.items():
             w.writerow([key, val])
-    
+
     # Else export to whatever filename that is provided in the format
     # used for txt files.
     else:
@@ -220,12 +225,16 @@ def exportCandidatePairs(candidatePairs, output_file, log):
                 for id2 in sortedElements[:-1]:
                     f.write(str(id2)+",")
                 f.write(str(sortedElements[-1])+"\n")
-        
+
     logprint(log, False, "Exported candidate pairs to", output_file,
              "in", time.clock()-tim, "seconds")
 
 
 def importCandidatePairs(input_file, log):
+    """
+    Import candidate pairs from a file.
+    Supported filetypes: txt, json, pickle (python) and csv.
+    """
     tim = time.clock()
     candidatePairs = dict()
     # Input file extension
@@ -290,7 +299,7 @@ def importCandidatePairs(input_file, log):
             else:
                 candidatePairs[key] = [val]
         logprint(log, False, "csv:", time.clock()-tim)
-        
+
     else:
         logprint(log, True, "File format is not supported for input file."
                  "Please specify file format (extension) as either txt,",
@@ -313,6 +322,10 @@ def importCandidatePairs(input_file, log):
 #                                                                            #
 # ************************************************************************** #
 def computeHashFunctions(n, shingles, log):
+    """
+    Computes n lists of shuffled elements from 1..#shingles.
+    These lists represents the hash functions needed for LSH.
+    """
     # Create n different permutations (hash functions) of the shingles
     tim = time.clock()
     hashfuncs = []
@@ -328,6 +341,10 @@ def computeHashFunctions(n, shingles, log):
 
 
 def computeShinglesTable(fasta_file, k, log):
+    """
+    Computes a table for fast look-up of k-shingles and their corresponding
+    position in the reads - when it was first encountered in the fasta file.
+    """
     logprint(log, True, "Computing table of shingles positions...")
     tim = time.clock()
     with open(fasta_file, "rU") as fasta_file:
@@ -376,6 +393,9 @@ def computeShinglesTable(fasta_file, k, log):
 
 
 def computeShinglesSet(fasta_file, k, log):
+    """
+    Computes the set of all k-shingles (k-mers) in all reads.
+    """
     logprint(log, True, "Computing set of all shingles...")
     tim = time.clock()
     with open(fasta_file, "rU") as fasta_file:
@@ -416,7 +436,7 @@ def computeShinglesSet(fasta_file, k, log):
 
 def getAllReads(fasta_file, log):
     """
-    Extract the reads (DNA sequences) from the given fasta file
+    Extract the reads (DNA sequences) from the given fasta file.
     """
     with open(fasta_file, "rU") as fasta_file:
         read = ""
@@ -453,6 +473,10 @@ def getAllReads(fasta_file, log):
 
 
 def getPartsFromFile(fasta_file, log):
+    """
+    Makes a generator object of all left- and right-parts of all reads
+    in the given fasta file.
+    """
     with open(fasta_file, "rU") as fasta_file:
         read = ""
         for line in fasta_file:
@@ -476,6 +500,9 @@ def getPartsFromFile(fasta_file, log):
 
 
 def isPrime(n):
+    """
+    Checks if the given number (n) is a prime number.
+    """
     if n == 2 or n == 3: return True
     if n < 2 or n % 2 == 0: return False
     if n < 9: return True
@@ -490,6 +517,9 @@ def isPrime(n):
 
 
 def getPrime(offset):
+    """
+    Finds the first prime number higher than a given offset.
+    """
     start = random.randrange(100)
     # print "start", start
     offset += start
@@ -532,7 +562,7 @@ def runLSH(fasta_file, bands, rows, n, k, seed, minhash_alg, log):
         tim = time.clock()
         random.seed(seed)
         candidatePairs = dict()
-        
+
         # Minhashing using pre-computed hash functions
         if minhash_alg == 3 or minhash_alg > 5:
             shingles = computeShinglesTable(fasta_file, k, log)
@@ -674,7 +704,7 @@ def lshBand(buckets, b, candidatePairs, log):
 
         # print "Finished LSH for band", b, "in", (time.clock() - tim) / 60, \
         #       "minutes"
-    
+
     return None
 
 
