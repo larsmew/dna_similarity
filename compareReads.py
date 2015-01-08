@@ -118,6 +118,7 @@ def optionParse():
     parser.add_option("-s", "--seed",
                       metavar="<VALUE>",
                       type=int,
+                      default=42,
                       action="store",
                       dest="s",
                       help="set <VALUE> as seed for hash functions.")
@@ -176,7 +177,7 @@ def exportCandidatePairs(candidatePairs, output_file, log):
 
     # save set information - However, more space consuming
     # and not needed. Hence, this should never be used.
-    if ext == "_set.pickle":
+    if ext == "set_pickle":
         with open(output_file, "w") as f:
             pickle.dump(candidatePairs, f)
 
@@ -198,7 +199,8 @@ def exportCandidatePairs(candidatePairs, output_file, log):
         with open(output_file, "w") as f:
             for id1 in candidatePairs:
                 f.write(str(id1)+"\t")
-                sortedElements = sorted(list(candidatePairs[id1]))
+                #sortedElements = sorted(list(candidatePairs[id1]))
+                sortedElements = list(candidatePairs[id1])
                 for id2 in sortedElements[:-1]:
                     f.write(str(id2)+",")
                 f.write(str(sortedElements[-1])+"\n")
@@ -221,7 +223,7 @@ def exportCandidatePairs(candidatePairs, output_file, log):
         with open(output_file, "w") as f:
             for id1 in candidatePairs:
                 f.write(str(id1)+"\t")
-                sortedElements = sorted(list(candidatePairs[id1]))
+                sortedElements = list(candidatePairs[id1])
                 for id2 in sortedElements[:-1]:
                     f.write(str(id2)+",")
                 f.write(str(sortedElements[-1])+"\n")
@@ -245,45 +247,40 @@ def importCandidatePairs(input_file, log):
     else:
         ext = ext[1]
 
-    if ext == "_set.pickle":
-        with open(input_file+ext, "r") as f:
+    if ext == "set_pickle":
+        with open(input_file, "r") as f:
             candidatePairs = pickle.load(f)
         logprint(log, False, "pickle-set:", time.clock()-tim)
 
-    elif ext == ".json":
-        with open(input_file+ext, "r") as f:
+    elif ext == "json":
+        with open(input_file, "r") as f:
             candidatePairs = json.load(f)
         logprint(log, False, "json:", time.clock()-tim)
-        for id1 in candidatePairs:
-            print id1
-            print candidatePairs[id1]
-        sys.exit()
 
-    elif ext == ".pickle":
-        with open(input_file+ext, "r") as f:
+    elif ext == "pickle":
+        with open(input_file, "r") as f:
             candidatePairs = pickle.load(f)
         logprint(log, False, "pickle-list:", time.clock()-tim)
 
     elif ext == "txt":
         with open(input_file, "r") as f:
+            imported = 0
             for line in f:
-                elements = line.split()
+                elements = line.split("\t", 1)
                 key = int(elements[0])
                 pairs = map(int, elements[1].split(','))
                 candidatePairs[key] = pairs
+                imported += len(pairs)
                 # print elements
                 # print key
                 # print pairs
                 # print candidatePairs[key]
                 # sys.exit()
-        logprint(log, False, "txt file:", time.clock()-tim)
-        # for id1 in candidatePairs:
-        #     print id1
-        #     print candidatePairs[id1]
-        # sys.exit()
+        logprint(log, False, "Imported", imported/2, "candidate pairs from", 
+                 input_file, "in", time.clock()-tim, "seconds.")
 
-    elif ext == "2.txt":
-        with open(input_file+ext, "r") as f:
+    elif ext == "txt2":
+        with open(input_file, "r") as f:
             for line in f:
                 elements = map(int, line.split())
                 if elements[0] in candidatePairs:
@@ -292,8 +289,8 @@ def importCandidatePairs(input_file, log):
                     candidatePairs[elements[0]] = [elements[1]]
         logprint(log, False, "txt2 file:", time.clock()-tim)
 
-    elif ext == ".csv":
-        for key, val in csv.reader(open(input_file+ext)):
+    elif ext == "csv":
+        for key, val in csv.reader(open(input_file)):
             if key in candidatePairs:
                 candidatePairs[key].append(val)
             else:
@@ -306,13 +303,13 @@ def importCandidatePairs(input_file, log):
                  "json, pickle or csv.")
         sys.exit()
 
-    for id1 in candidatePairs:
-        print id1
-        print candidatePairs[id1]
-        #sys.exit()
+    # Print imported candidate pairs
+    # for id1 in candidatePairs:
+    #     print id1
+    #     print candidatePairs[id1]
+    #     sys.exit()
 
     logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
-    #sys.exit()
     return candidatePairs
 
 
@@ -563,11 +560,14 @@ def runLSH(fasta_file, bands, rows, n, k, seed, minhash_alg, log):
         random.seed(seed)
         candidatePairs = dict()
 
-        # Minhashing using pre-computed hash functions
+        # Computes table of all k-shingles and their position
         if minhash_alg == 3 or minhash_alg > 5:
             shingles = computeShinglesTable(fasta_file, k, log)
+        # Computes set of all k-shingles
         else:  # minhash alg 1, 2, 4 or 5
             shingles = computeShinglesSet(fasta_file, k, log)
+        # Use Locality-Sensitive Hashing computing for each bands the buckets
+        # with similar documents (reads) obtained by minhashing each read.
         for b in xrange(bands):
             buckets = dict()
             minhashing(fasta_file, shingles, buckets, k, rows,
@@ -578,20 +578,6 @@ def runLSH(fasta_file, bands, rows, n, k, seed, minhash_alg, log):
         # for id1 in candidatePairs:
         #     candidatePairs[id1] = list(candidatePairs[id1])
 
-
-        # Type 1 - "First Hash"
-        # if minhash_alg < 3:
-        #     shingles = computeShinglesSet(fasta_file, k, log)
-        #     for b in xrange(bands):
-        #         hashfuncs = computeHashFunctions(rows, shingles, log)
-        #         buckets = dict()
-        #         idx = 0
-        #         for part in getPartsFromFile(fasta_file, log):
-        #             minhashing_alg1(part, idx, shingles, buckets, k, rows,
-        #                             hashfuncs)
-        #             idx += 1
-        #         lshBand(buckets, b, candidatePairs, log)
-
         logprint(log, False, "\nNumber of unique candidate pairs",
                  sum(len(candidatePairs[i]) for i in candidatePairs)/2)
         logprint(log, False, "Finished LSH in",
@@ -601,7 +587,7 @@ def runLSH(fasta_file, bands, rows, n, k, seed, minhash_alg, log):
         return candidatePairs
 
     else:
-        logprint(log, True, "ERROR: NO FASTA FILE PROVIDED")
+        logprint(log, True, "ERROR: NO FASTA FILE OR IMPORT FILE PROVIDED")
         sys.exit()
 
 
@@ -1199,9 +1185,7 @@ def NeedlemanWunsch(doc1, doc2):
 # ************************************************************************** #
 class AlignedGroup(object):
     """
-    Defines the data structure of a document. Like dna sequence, id, left or
-    right part of string, shingles related to the string, the minhash
-    signature
+    
     """
     #consensusMain = 0  # read_R
     consensusLeft = ""
@@ -1241,7 +1225,6 @@ def sequenceAlignment(candidatePairs, fasta_file, log):
             # Align right parts
             alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log)
 
-
             if doPrint:
                 for group in alignedGroups[read_R]:
                     logprint(log, False, "\n Consensus:")
@@ -1277,8 +1260,10 @@ def sequenceAlignment(candidatePairs, fasta_file, log):
 
             proc += 1
             if proc % 500000 == 0:
-                logprint(log, True, "Processed", proc, "of", numParts,
+                logprint(log, False, "Processed", proc, "of", numParts,
                          "right parts in", (time.clock()-tim) / 60, "minutes")
+                logprint(log, True, "Memory usage (in mb):",
+                         memory_usage_resource())
 
     logprint(log, False, "Finished sequence alignment",
              (time.clock() - tim) / 60, "minutes")
