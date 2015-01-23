@@ -8,7 +8,6 @@ __version__ = "$Revision: 2.0"
 from optparse import OptionParser
 from operator import itemgetter
 from collections import Counter
-from collections import deque
 from itertools import izip
 import sys
 import time
@@ -854,6 +853,7 @@ def minhashing_alg6(dna, idx, shingles, buckets, k, rows, p, a, b):
     """
     # Find signature for each document
     signature = []
+    #signature = array.array('l')
     docShingles = getDocShingles(dna, k)
     numShingles = len(shingles)
     for i in xrange(rows):
@@ -1250,7 +1250,7 @@ def sequenceAlignment(candidatePairs, fasta_file, log):
     tim = time.clock()
     for read_R in candidatePairs:
         if read_R % 2 == 1:
-        #if read_R == 275:
+        #if read_R == 197:
             #consensus = []
             alignedGroups = dict()
 
@@ -1303,72 +1303,18 @@ def sequenceAlignment(candidatePairs, fasta_file, log):
                          "right parts in", (time.clock()-tim) / 60, "minutes")
                 logprint(log, True, "Memory usage (in mb):",
                          memory_usage_resource())
+                logprint(log, False, "left parts aligned:", c1)
+                logprint(log, True, "right parts aligned:", c2)
+                global c1
+                c1 = 0
+                global c2
+                c2 = 0
 
     logprint(log, False, "Finished sequence alignment",
              (time.clock() - tim) / 60, "minutes")
     logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
     logprint(log, False, "c1:", c1)
     logprint(log, False, "c2:", c2)
-
-
-def getSequences(fasta_file, ids, log):
-    """
-    Extract the reads (DNA sequences) from the given fasta file
-    """
-    with open(fasta_file, "rU") as fasta_file:
-        read = ""
-        tim = time.clock()
-        #logprint(log, False, "Collecting sequences...")
-        reads = []
-        seqs = 0
-        id = 0
-        idx = 0
-        for line in fasta_file:
-            # If line starts with ">", which indicates end of a
-            # sequence, append it to list of reads
-            if line.startswith(">"):
-                if read != "":
-                    # Splits the string into two parts
-                    if idx == ids[id]:
-                        leftpart = read[:len(read)/2]
-                        reads.append(leftpart)
-                        seqs += 1
-                        id += 1
-                        if id == len(ids):
-                            read = ""
-                            break
-                    idx += 1
-                    if idx == ids[id]:
-                        rightpart = read[len(read)/2:]
-                        reads.append(rightpart)
-                        seqs += 1
-                        id += 1
-                        if id == len(ids):
-                            read = ""
-                            break
-                    idx += 1
-                    read = ""
-            # Concatenate multi-line sequences into one string
-            else:
-                read += line.strip().upper()
-        if read != "":
-            if idx == ids[id]:
-                leftpart = read[:len(read)/2]
-                reads.append(leftpart)
-                seqs += 1
-                id += 1
-            idx += 1
-
-            if id != len(ids) and idx == ids[id]:
-                rightpart = read[len(read)/2:]
-                reads.append(rightpart)
-                seqs += 1
-
-        # logprint(log, False, "Finished reading in",
-        #          (time.clock() - tim) / 60, "minutes")
-        # logprint(log, False, "Found", seqs, "sequences in fasta file")
-        # logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
-        return reads
 
 
 def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log):
@@ -1378,6 +1324,8 @@ def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log):
             newGroup = True
             for group in alignedGroups[read_R]:
                 if fitsInGroup(group, seqs, read_R, read_L, offset, M2):
+                    global c1
+                    c1 += 1
                     # Add read_L to group
                     if read_L in group.leftParts:
                         group.leftParts[read_L].append(offset)
@@ -1389,6 +1337,8 @@ def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log):
                     break
             # If read_L doesn't fit in any group, then create a new
             if newGroup:
+                global c1
+                c1 += 1
                 group = AlignedGroup(read_R, len(seqs[read_R-1]))
                 # Start of extra part - offsetExtraPart
                 start = len(seqs[read_R]) - offset
@@ -1657,25 +1607,15 @@ def fitsInGroup3(group, seqs, read_R, next_read_R, offset, offset2, m2):
     return True
 
 
-def fitsInGroup4(group, seqs, read_R, next_read_R, offset, offset2, m2):
-    #seq_next_read_R_1 = "GAAAT"+seqs[next_read_R-1][2:]
+def fitsInGroup4(group, seqs, read_R, next_read_R, offset, offset2, m2, read_L):
     seq_next_read_R = seqs[next_read_R-1]+seqs[next_read_R]
     seq_read_R = seqs[read_R-1]+seqs[read_R]
     mismatches = 0
-    # print " "*abs(offset), ''.join(consensus.keys()[0] for consensus in group.consensus)
-    # print " "*abs(offset), seqs[read_R-1]+seqs[read_R]
-    # print "", seq_next_read_R
-    # ACGTACGT
-    #    TACGTAGT
 
     # toExtend2 = len(seq_next_read_R) - len(group.consensus[:len(seq_read_R)+offset])
-    # group.preConsensus = ["A","A","A"]
-    # toExtend = -(len(group.preConsensus) + (group.readROffset - len(seq_next_read_R_1) + offset))
+
     toExtend = -(len(group.preConsensus) + (group.readROffset -
                  len(seqs[next_read_R-1]) + offset))
-    # print offset
-    # print group.readROffset
-    # print len(seq_next_read_R_1)
     # print toExtend
     # print toExtend2
     # print " "*(-toExtend), seq_next_read_R
@@ -1709,21 +1649,45 @@ def fitsInGroup4(group, seqs, read_R, next_read_R, offset, offset2, m2):
 
         else:
 
-            for i in xrange(len(seq_next_read_R)-toExtend):
-                if len(group.consensus[i]) > 1 or group.\
-                       consensus[i].keys()[0] != seq_next_read_R[i+toExtend]:
+            # Cases:
+            # A CG TACGT        # Expected read_j,L
+            #   CG TACGTACGTA
+            # A C               # Short read_j,L (probably never)
+
+            lenPreConsensus = len(group.preConsensus)
+            # if lenPreConsensus > len(seq_next_read_R)-toExtend:
+            #     lenPreConsensus = len(seq_next_read_R)-toExtend
+            for i in xrange(lenPreConsensus):
+                if len(group.preConsensus[i]) > 1 or group.preConsensus[i]. \
+                       keys()[0] != seq_next_read_R[i+toExtend]:
                     mismatches += 1
                     if mismatches > m2:
                         return False
 
-            for i in xrange(len(seq_next_read_R)-toExtend):
+            start = lenPreConsensus+toExtend
+            for i in xrange(len(seq_next_read_R)-start):
+                if len(group.consensus[i]) > 1 or group.\
+                       consensus[i].keys()[0] != seq_next_read_R[i+start]:
+                    mismatches += 1
+                    if mismatches > m2:
+                        return False
+
+            for i in xrange(lenPreConsensus):
                 bp = seq_next_read_R[i+toExtend]
+                group.preConsensus[i][bp] = \
+                        group.preConsensus[i].get(bp, 0) + 1
+
+            for i in xrange(len(seq_next_read_R)-start):
+                bp = seq_next_read_R[i+start]
                 group.consensus[i][bp] = group.consensus[i].get(bp, 0) + 1
 
-            group.readROffset += toExtend
             prePart = [{seq_next_read_R[i]:1} for i in xrange(toExtend)]
-            group.consensus = prePart + group.consensus
+            group.preConsensus = prePart + group.preConsensus
 
+
+        # print " "*(toExtend+1), ''.join(str(consensus.values()[0])+" " for consensus in group.preConsensus)+''.join(str(consensus.values()[0])+" " for consensus in group.consensus)
+
+        # print "", ''.join(str(consensus.values()[0])+" " for consensus in group.preConsensus)+''.join(str(consensus.values()[0])+" " for consensus in group.consensus)
 
         # print "", ''.join(consensus.keys()[0] for consensus in group.consensus)
         # print "", ''.join(str(consensus.values()[0])+" " for consensus in group.consensus), "\n"
@@ -1745,17 +1709,53 @@ def fitsInGroup4(group, seqs, read_R, next_read_R, offset, offset2, m2):
             for pos, bp in izip(group.consensus[offset:], seq_next_read_R):
                 pos[bp] = pos.get(bp, 0) + 1
         else:
-            offset += group.readROffset-len(seqs[read_R-1])
-            for i in xrange(len(seq_next_read_R)):
-                if len(group.consensus[i+offset]) > 1 or group.\
-                       consensus[i+offset].keys()[0] != seq_next_read_R[i]:
+            # if offset < 0:
+            #     print offset
+            #     print len(group.preConsensus)
+            #     print "", ''.join(str(consensus.keys()[0]) for consensus in group.preConsensus) + ''.join(consensus.keys()[0] for consensus in group.consensus)
+            #     print " "*(offset+len(group.preConsensus)), seq_next_read_R
+                #sys.exit()
+
+            # Cases:
+            # A CG TACGT        # Expected read_j,L
+            #   CG TACGTACGTA
+            #   CG               # Short read_j,L (probably never)
+
+            offset += group.readROffset - len(seqs[next_read_R-1])
+            if offset > 0:
+                j = offset
+                start = 0
+            else:
+                # if read_k aligns in middle of consensus
+                j = 0
+                # preconsensus already check, start offset in read_k
+                start = -offset
+                # Offset in preConsensus
+                l = len(group.preConsensus)+offset
+
+            for i in xrange(start):
+                #print group.preConsensus[i+l].keys()[0], seq_next_read_R[i]
+                if len(group.preConsensus[i+l]) > 1 or group.\
+                       preConsensus[i+l].keys()[0] != seq_next_read_R[i]:
                     mismatches += 1
                     if mismatches > m2:
                         return False
 
-            for i in xrange(len(seq_next_read_R)):
-                group.consensus[i+offset][seq_next_read_R[i]] = \
-                     group.consensus[i+offset].get(seq_next_read_R[i], 0) + 1
+            for i in xrange(len(seq_next_read_R)-start):
+                #print group.consensus[i+j].keys()[0], seq_next_read_R[i+k]
+                if len(group.consensus[i]) > 1 or group.\
+                       consensus[i+j].keys()[0] != seq_next_read_R[i+start]:
+                    mismatches += 1
+                    if mismatches > m2:
+                        return False
+
+            for i in xrange(start):
+                group.preConsensus[i+l][seq_next_read_R[i]] = \
+                    group.preConsensus[i+l].get(seq_next_read_R[i], 0) + 1
+
+            for i in xrange(len(seq_next_read_R)-start):
+                group.consensus[i+j][seq_next_read_R[i+start]] = \
+                     group.consensus[i+j].get(seq_next_read_R[i+start], 0) + 1
 
     group.mismatches += mismatches
     return True
@@ -1788,7 +1788,9 @@ def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
                             #             group.rightParts[next_read_R] = [offset]
 
                             if fitsInGroup4(group, seqs, read_R, next_read_R,
-                                            offset, offset2, M2):
+                                            offset, offset2, M2, read_L):
+                                global c2
+                                c2 += 1
                                 group.rightParts[next_read_R] = [offset]
     return newOffset
 
@@ -1851,7 +1853,9 @@ def main():
 
 
 if __name__ == '__main__':
-
+    """
+    Main method call
+    """
     main()
 
     sys.exit(0)
