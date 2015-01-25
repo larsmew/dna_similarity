@@ -1608,34 +1608,53 @@ def fitsInGroup3(group, seqs, read_R, next_read_R, offset, offset2, m2):
     return True
 
 
-def fitsInGroup4(group, seqs, read_R, next_read_R, offset, offset2, m2, read_L):
+def fitsInGroup4(group, seqs, read_R, next_read_R, offset, offset2, m2):
     seq_next_read_R = seqs[next_read_R-1]+seqs[next_read_R]
-    seq_read_R = seqs[read_R-1]+seqs[read_R]
     mismatches = 0
 
+    # Computes the length of the pre-consensus extension, if any
     lenPreConsensus = len(group.preConsensus)
     toExtend = -(lenPreConsensus + (group.readROffset -
                  len(seqs[next_read_R-1]) + offset))
 
+    # Computes real offset of next_read_R in consensus - only changes if reads
+    # have varying lengths
     offset += group.readROffset - len(seqs[next_read_R-1])
-    
+
     if toExtend > 0:
+        """
+        Case 1 - extending pre-consensus:
+         GAG TTATCATTGTGACTGGACAAAGTACG
+        GGAG TTATCATTGTGACTGGACAAA
+        """
         beginning = lenPreConsensus
         j = 0
         l = 0
     elif offset > 0:
-        j = offset
+        """
+        Case 2 - no pre consensus access:
+        GAG TTATCATTGTGACTGGACAAAGTACG
+               TCATTGTGACTGGACAAA
+        """
         beginning = 0
+        j = offset
         toExtend = 0
     else:  # offset < 0
-        # if read_k aligns in middle of consensus
-        j = 0
+        """
+        Case 3 - touching pre-consensus:
+        GAG TTATCATTGTGACTGGACAAAGTACG
+         AG TTATCATTGTGACTGGACAAA
+        """
         # preconsensus already checked, start offset in read_k
         beginning = -offset
+        # if read_k aligns in middle of consensus
+        j = 0
         # Offset in preConsensus
         l = lenPreConsensus+offset
+        # No extension
         toExtend = 0
 
+    # Check if next_read_R matches pre-consensus
     for i in xrange(beginning):
         #print group.preConsensus[i+l].keys()[0], seq_next_read_R[i]
         if len(group.preConsensus[i+l]) > 1 or group.\
@@ -1644,6 +1663,7 @@ def fitsInGroup4(group, seqs, read_R, next_read_R, offset, offset2, m2, read_L):
             if mismatches > m2:
                 return False
 
+    # Check if next_read_R matches main-consensus
     start = beginning + toExtend
     for i in xrange(len(seq_next_read_R)-start):
         if len(group.consensus[i+j]) > 1 or group.\
@@ -1652,149 +1672,21 @@ def fitsInGroup4(group, seqs, read_R, next_read_R, offset, offset2, m2, read_L):
             if mismatches > m2:
                 return False
 
-    
+    # Update pre-consensus
     for i in xrange(beginning):
         bp = seq_next_read_R[i+toExtend]
         group.preConsensus[i+l][bp] = group.preConsensus[i+l].get(bp, 0) + 1
-        # group.preConsensus[i+l][seq_next_read_R[i+toExtend]] = group.preConsensus[i+l].get(seq_next_read_R[i+toExtend], 0) + 1
 
+    # Update main-consensus
     for i in xrange(len(seq_next_read_R)-start):
         bp = seq_next_read_R[i+start]
         group.consensus[i+j][bp] = group.consensus[i+j].get(bp, 0) + 1
-        # group.consensus[i+j][seq_next_read_R[i+start]] = group.consensus[i+j].get(seq_next_read_R[i+start], 0) + 1
-    
+
+    # Extend pre-consensus if required
     if toExtend > 0:
         prePart = [{seq_next_read_R[i]:1} for i in xrange(toExtend)]
         group.preConsensus = prePart + group.preConsensus
 
-
-
-
-    #
-    #
-    # if toExtend > 0:
-    #     # global c1
-    #     # c1 += 1
-    #     #print " "*toExtend, seq_next_read_R[toExtend:]
-    #
-    #     if zipAndSlice:
-    #
-    #         # Using zip and slices
-    #         for pos, bp in izip(group.consensus, seq_next_read_R[toExtend:]):
-    #             if len(pos) > 1 or pos.keys()[0] != bp:
-    #                 mismatches += 1
-    #                 if mismatches > m2:
-    #                     return False
-    #
-    #         for pos, bp in izip(group.consensus, seq_next_read_R[toExtend:]):
-    #             pos[bp] = pos.get(bp, 0) + 1
-    #
-    #         # Extend consensus with pre-part
-    #         group.readROffset += toExtend
-    #         prePart = [{bp:1} for bp in seq_next_read_R[:toExtend]]
-    #         group.consensus = prePart + group.consensus
-    #
-    #     else:
-    #
-    #         # Cases:
-    #         # A CG TACGT        # Expected read_j,L
-    #         #   CG TACGTACGTA
-    #         # A C               # Short read_j,L (probably never)
-    #
-    #         lenPreConsensus = len(group.preConsensus)
-    #         for i in xrange(lenPreConsensus):
-    #             if len(group.preConsensus[i]) > 1 or group.preConsensus[i]. \
-    #                    keys()[0] != seq_next_read_R[i+toExtend]:
-    #                 mismatches += 1
-    #                 if mismatches > m2:
-    #                     return False
-    #
-    #         start = lenPreConsensus+toExtend
-    #         for i in xrange(len(seq_next_read_R)-start):
-    #             if len(group.consensus[i]) > 1 or group.\
-    #                    consensus[i].keys()[0] != seq_next_read_R[i+start]:
-    #                 mismatches += 1
-    #                 if mismatches > m2:
-    #                     return False
-    #
-    #         for i in xrange(lenPreConsensus):
-    #             bp = seq_next_read_R[i+toExtend]
-    #             group.preConsensus[i][bp] = \
-    #                     group.preConsensus[i].get(bp, 0) + 1
-    #
-    #         for i in xrange(len(seq_next_read_R)-start):
-    #             bp = seq_next_read_R[i+start]
-    #             group.consensus[i][bp] = group.consensus[i].get(bp, 0) + 1
-    #
-    #         prePart = [{seq_next_read_R[i]:1} for i in xrange(toExtend)]
-    #         group.preConsensus = prePart + group.preConsensus
-    #
-    #
-    #     # print " "*(toExtend+1), ''.join(str(consensus.values()[0])+" " for consensus in group.preConsensus)+''.join(str(consensus.values()[0])+" " for consensus in group.consensus)
-    #
-    #     # print "", ''.join(str(consensus.values()[0])+" " for consensus in group.preConsensus)+''.join(str(consensus.values()[0])+" " for consensus in group.consensus)
-    #
-    #     # print "", ''.join(consensus.keys()[0] for consensus in group.consensus)
-    #     # print "", ''.join(str(consensus.values()[0])+" " for consensus in group.consensus), "\n"
-    # else:
-    #     if zipAndSlice:
-    #         offset += group.readROffset-len(seqs[read_R-1])
-    #         for pos, bp in izip(group.consensus[offset:], seq_next_read_R):
-    #             if len(pos) > 1 or pos.keys()[0] != bp:
-    #                 mismatches += 1
-    #                 if mismatches > m2:
-    #                     return False
-    #
-    #         for pos, bp in izip(group.consensus[offset:], seq_next_read_R):
-    #             pos[bp] = pos.get(bp, 0) + 1
-    #     else:
-    #         # if offset < 0:
-    #         #     print offset
-    #         #     print len(group.preConsensus)
-    #         #     print "", ''.join(str(consensus.keys()[0]) for consensus in group.preConsensus) + ''.join(consensus.keys()[0] for consensus in group.consensus)
-    #         #     print " "*(offset+len(group.preConsensus)), seq_next_read_R
-    #             #sys.exit()
-    #
-    #         # Cases:
-    #         # A CG TACGT        # Expected read_j,L
-    #         #   CG TACGTACGTA
-    #         #   CG               # Short read_j,L (probably never)
-    #
-    #         offset += group.readROffset - len(seqs[next_read_R-1])
-    #         if offset > 0:
-    #             j = offset
-    #             start = 0
-    #         else:
-    #             # if read_k aligns in middle of consensus
-    #             j = 0
-    #             # preconsensus already check, start offset in read_k
-    #             start = -offset
-    #             # Offset in preConsensus
-    #             l = len(group.preConsensus)+offset
-    #
-    #         for i in xrange(start):
-    #             #print group.preConsensus[i+l].keys()[0], seq_next_read_R[i]
-    #             if len(group.preConsensus[i+l]) > 1 or group.\
-    #                    preConsensus[i+l].keys()[0] != seq_next_read_R[i]:
-    #                 mismatches += 1
-    #                 if mismatches > m2:
-    #                     return False
-    #
-    #         for i in xrange(len(seq_next_read_R)-start):
-    #             #print group.consensus[i+j].keys()[0], seq_next_read_R[i+k]
-    #             if len(group.consensus[i+j]) > 1 or group.\
-    #                    consensus[i+j].keys()[0] != seq_next_read_R[i+start]:
-    #                 mismatches += 1
-    #                 if mismatches > m2:
-    #                     return False
-    #
-    #         for i in xrange(start):
-    #             group.preConsensus[i+l][seq_next_read_R[i]] = \
-    #                 group.preConsensus[i+l].get(seq_next_read_R[i], 0) + 1
-    #
-    #         for i in xrange(len(seq_next_read_R)-start):
-    #             group.consensus[i+j][seq_next_read_R[i+start]] = \
-    #                  group.consensus[i+j].get(seq_next_read_R[i+start], 0) + 1
 
     group.mismatches += mismatches
     return True
@@ -1827,7 +1719,7 @@ def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
                             #             group.rightParts[next_read_R] = [offset]
 
                             if fitsInGroup4(group, seqs, read_R, next_read_R,
-                                            offset, offset2, M2, read_L):
+                                            offset, offset2, M2):
                                 global c2
                                 c2 += 1
                                 group.rightParts[next_read_R] = [offset]
