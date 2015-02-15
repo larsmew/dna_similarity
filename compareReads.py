@@ -29,6 +29,8 @@ numreadR = 0
 M1 = 1
 M2 = 1
 
+old = False
+
 # ************************************************************************** #
 #                                                                            #
 #                                   Helpers                                  #
@@ -1253,6 +1255,8 @@ def print_fullConsensus(preconsensus, consensus, log=None):
                 consensusString += preconsensus[j].keys()[i]
             else:
                 consensusString += " "
+        # if consensusString != "":
+        #     consensusString += " "
         for j in xrange(len(consensus)):
             if i < len(consensus[j]):
                 consensusString += consensus[j].keys()[i]
@@ -1271,47 +1275,51 @@ def print_alignedGroups(groups, read_R, seqs, log):
         for group in groups:
             if len(group.rightPartGroups) > 0:
                 for rightPartGroup in group.rightPartGroups:
-                    logprint(log, False, "\nread_R:", read_R)
-                    logprint(log, False, "Consensus:")
-                    # logprint(log, False, "", ''.join(consensus.keys()[0]
-                    #         for consensus in group.preConsensus) + #" " +
-                    #         ''.join(consensus.keys()[0] for consensus
-                    #         in group.consensus))
-                    print_fullConsensus(rightPartGroup.preConsensus,
-                                        rightPartGroup.consensus, log)
-                    lenPre = len(rightPartGroup.preConsensus)
-                    newOffset = lenPre + group.readROffset
-                    for read_L in group.leftParts:
-                        for offset in group.leftParts[read_L]:
-                            logprint(log, False, " " * (newOffset +
-                                 offset), seqs[read_L]+""+seqs[read_L+1])
-                    for read_R2 in rightPartGroup.rightParts:
-                        for offset in rightPartGroup.rightParts[read_R2]:
-                            logprint(log, False, " " * (offset + lenPre),
-                                     seqs[read_R2-1]+""+seqs[read_R2])
-                    logprint(log, False, "Left parts:",
-                             sorted(list(group.leftParts)))
-                    logprint(log, False, "Number of left parts:",
-                             len(group.leftParts))
-                    logprint(log, False, "Right parts:",
-                             sorted(rightPartGroup.rightParts))
-                    logprint(log, False, "Number of right parts:",
-                             len(rightPartGroup.rightParts))
-                    # logprint(log, False, "mismatches",
-                    #          rightPartGroup.mismatches)
-                    # logprint(log, False, "Number of mismatches:",
-                    #          len(rightPartGroup.mismatches))
-                    # if len(group.mismatches) > 0:
-                    #     sys.exit()
-            else:
+                    if len(rightPartGroup.mismatches) > 0:
+                        logprint(log, False, "\nread_R:", read_R)
+                        logprint(log, False, "Consensus:")
+                        # logprint(log, False, "", ''.join(consensus.keys()[0]
+                        #         for consensus in group.preConsensus) + #" " +
+                        #         ''.join(consensus.keys()[0] for consensus
+                        #         in group.consensus))
+                        print_fullConsensus(rightPartGroup.preConsensus,
+                                            rightPartGroup.consensus, log)
+                        lenPre = len(rightPartGroup.preConsensus)
+                        newOffset = lenPre + group.readROffset
+                        for read_L in group.leftParts:
+                            for offset in group.leftParts[read_L]:
+                                logprint(log, False, " " * (newOffset +
+                                     offset), seqs[read_L]+""+seqs[read_L+1])
+                        for read_R2 in rightPartGroup.rightParts:
+                            for offset in rightPartGroup.rightParts[read_R2]:
+                                logprint(log, False, " " * (offset + lenPre),
+                                         seqs[read_R2-1]+""+seqs[read_R2])
+                        logprint(log, False, "Left parts:",
+                                 sorted(list(group.leftParts)))
+                        logprint(log, False, "Number of left parts:",
+                                 len(group.leftParts))
+                        logprint(log, False, "Right parts:",
+                                 sorted(rightPartGroup.rightParts))
+                        logprint(log, False, "Number of right parts:",
+                                 len(rightPartGroup.rightParts))
+                        logprint(log, False, "mismatches:",
+                                 list(rightPartGroup.mismatches))
+                        # logprint(log, False, "Number of mismatches:",
+                        #          len(rightPartGroup.mismatches))
+                        # if len(group.mismatches) > 0:
+                        #     sys.exit()
+            # else:
+            elif len(group.mismatches) > 0:
                 logprint(log, False, "\nread_R:", read_R)
                 logprint(log, False, "Consensus:")
-                logprint(log, False, "", ''.join(consensus.keys()[0]
-                         for consensus in group.consensus))
+                # logprint(log, False, "", ''.join(consensus.keys()[0]
+                #          for consensus in group.consensus))
+                print_fullConsensus([],
+                                    group.consensus, log)
                 for read_L in group.leftParts:
                     for offset in group.leftParts[read_L]:
-                        logprint(log, False, " " *(offset + 
-                                 group.readROffset),    
+                        logprint(log, False, " " *(offset +
+                                 group.readROffset),
                                  seqs[read_L]+""+seqs[read_L+1])
                 logprint(log, False, "mismatches:", group.mismatches)
                 logprint(log, False, "Left parts:",
@@ -1328,7 +1336,7 @@ def sequenceAlignment(candidatePairs, fasta_file, log):
     tim = time.clock()
     for read_R in candidatePairs:
         if read_R % 2 == 1:
-        #if read_R == 21:
+        # if read_R == 765:
             alignedGroups = dict()
 
             # Align left parts
@@ -1337,7 +1345,7 @@ def sequenceAlignment(candidatePairs, fasta_file, log):
             # Align right parts
             alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log)
 
-            print_alignedGroups(alignedGroups[read_R], read_R, seqs, log)
+            # print_alignedGroups(alignedGroups[read_R], read_R, seqs, log)
             # sys.exit()
 
             prog += 1
@@ -1405,7 +1413,7 @@ def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log):
 
                 # Add read_L to new the group
                 group.leftParts[read_L] = [offset]
-                group.leftReadsOffset = offset
+                group.leftReadsOffset = offset+group.readROffset
                 group.mismatches = mis
 
                 # Add anchor point to consensus
@@ -1449,6 +1457,7 @@ def findAlignment(read_R, read_L, readROffset, m1, log):
                     print read_L
                 else:
                     print " "*(offset-1), read_L
+                print mismatches
             yield offset, mismatches, lengthToCompare
         offset += 1
         lengthToCompare -= 1
@@ -1463,8 +1472,6 @@ def fitsInGroup(group, seqs, read_R, read_L, alignInfo, offset, m2):
     mismatches = 0
     offset += group.readROffset
     offset2, mis, lenCompared = alignInfo
-    
-    old = False
 
     if old:
         # Check consensus for mismatches before alignment of read_L
@@ -1496,7 +1503,7 @@ def fitsInGroup(group, seqs, read_R, read_L, alignInfo, offset, m2):
         #     if len(group.consensus[i+offset]) > 1 or \
         #        group.consensus[i+offset].keys()[0] != lread_L[i]:
         #         mismatches.add(i+offset)
-        
+
         lenToCompare = len(group.consensus)-len(seq_read_R)
         readLLength = len(lread_L) - lenCompared
         # print lenCompared
@@ -1507,7 +1514,7 @@ def fitsInGroup(group, seqs, read_R, read_L, alignInfo, offset, m2):
             # print extraStart
             # print_fullConsensus([], group.consensus)
             # print " "*offset, lread_L
-        
+
         for i in xrange(lenToCompare):
             if len(group.consensus[i+len(seq_read_R)]) > 1 or \
                     group.consensus[i+len(seq_read_R)].keys()[0] != \
@@ -1518,13 +1525,13 @@ def fitsInGroup(group, seqs, read_R, read_L, alignInfo, offset, m2):
             mismatches.add(m)
         for m in mis:
             mismatches.add(m)
-            
+
         if len(mismatches) <= m2:
             group.mismatches = mismatches
         else:
             return False
-    
-    
+
+
     # Update consensus
     lenToUpdate = min(len(group.consensus)-offset, len(lread_L))
     for i in xrange(lenToUpdate):
@@ -1536,8 +1543,11 @@ def fitsInGroup(group, seqs, read_R, read_L, alignInfo, offset, m2):
     for i in xrange(extraPart):
         group.consensus.append({lread_L[-(extraPart-i)]:1})
 
-    if group.leftReadsOffset > offset:
-        group.leftReadsOffset = offset
+    newLeftReadsOffset = offset+group.readROffset
+    if group.leftReadsOffset > newLeftReadsOffset:
+        group.leftReadsOffset = newLeftReadsOffset
+    # if group.leftReadsOffset > offset:
+    #     group.leftReadsOffset = offset
         # print_fullConsensus([], group.consensus)
         # print " "*offset, lread_L
         # print offset
@@ -1595,8 +1605,6 @@ def fitsInGroup4(groupOrg, group, seqs, read_R, next_read_R, offset, mis, m2):
         # No extension
         toExtend = 0
 
-    old = False
-
     if old:
 
         mismatches = 0
@@ -1636,15 +1644,21 @@ def fitsInGroup4(groupOrg, group, seqs, read_R, next_read_R, offset, mis, m2):
     else:
         localMismatches = set([mismatch for mismatch in mis])
         mismatches = mis
+        for mismatch in groupOrg.mismatches:
+            mismatches.add(mismatch)
         for mismatch in group.mismatches:
             mismatches.add(mismatch)
+
+
+        # print "hej"
+        # print mismatches
 
         # if offset < 0:
         #     print " "*(-offset), print_fullConsensus([],group.consensus)
         # else:
         #     print_fullConsensus([],group.consensus)
         # print " "*offset, seq_next_read_R
-        
+
         start = beginning + toExtend
         for i in xrange(groupOrg.leftReadsOffset):
             if len(group.consensus[i+j]) > 1 or group.\
@@ -1654,20 +1668,26 @@ def fitsInGroup4(groupOrg, group, seqs, read_R, next_read_R, offset, mis, m2):
                     localMismatches.add(i+j)
                 # if len(mismatches) > m2:
                 #     return False
-                    
+
         # Check if next_read_R matches pre-consensus
         for i in xrange(beginning):
+            # print group.preConsensus
             if len(group.preConsensus[i+l]) > 1 or group.\
                    preConsensus[i+l].keys()[0] != seq_next_read_R[i+toExtend]:
-                mismatches.add(i+l)
+                mismatches.add(beginning-(i+l))
                 if seq_read_R[i+l] != seq_next_read_R[i+toExtend]:
-                    localMismatches.add(i+l)
+                    localMismatches.add(beginning-(i+l))
                 # if len(mismatches) > m2:
                 #     return False
-        
+
         if len(mismatches) > m2 and len(localMismatches) <= m2:
-            createNewGroup(groupOrg, seqs, read_R, next_read_R, offset, m2)
+            createNewGroup(groupOrg, next_read_R, seq_next_read_R, offset, localMismatches)
             return False
+        elif len(mismatches) > m2:
+            return False
+
+        #print mismatches
+        group.mismatches = mismatches
 
 
     # Update pre-consensus
@@ -1698,19 +1718,21 @@ def fitsInGroup4(groupOrg, group, seqs, read_R, next_read_R, offset, mis, m2):
 
 
 def dismissRead(group, seqs, next_read_R, offset):
-    seq_next_read = seqs[next_read_R-1]+seqs[next_read_R]
-    # print_fullConsensus([],group.consensus, -offset)
-    # print " "*offset, seq_next_read
-    lenToCompare = len(seq_next_read) - (group.leftReadsOffset - offset)
+    seq_next_read_R = seqs[next_read_R-1]+seqs[next_read_R]
+    #print " "*-offset,
+    # print_fullConsensus([],group.consensus)
+    # print " "*offset, seq_next_read_R
+    # print
+    lenToCompare = len(seq_next_read_R) - (group.leftReadsOffset - offset)
     mismatches = set()
     for i in xrange(lenToCompare):
         if len(group.consensus[group.leftReadsOffset+i]) > 1 or \
                 group.consensus[group.leftReadsOffset+i].keys()[0] != \
-                seq_next_read[i+group.leftReadsOffset-offset]:
+                seq_next_read_R[i+group.leftReadsOffset-offset]:
             mismatches.add(group.leftReadsOffset+i)
             # if len(mismatches) > m1:
             #     return True
-    
+
     # if offset > 0:
     #     lenToCompare = group.leftReadsOffset - offset
     #     j = offset
@@ -1719,8 +1741,8 @@ def dismissRead(group, seqs, next_read_R, offset):
     #     l = -offset
     #
     # for i in xrange(lenToCompare):
-        
-            
+
+
     return mismatches
 
 
@@ -1737,21 +1759,11 @@ def alignRightParts_secondPass(group, seqs):
                     shallowGroup.preRightParts[pre_read_R] = set([offset])
 
 
-def createNewGroup(group, seqs, read_R, next_read_R, offset, log):
+def createNewGroup(group, next_read_R, seq_next_read_R, offset, mismatches):
     global c5
     c5 += 1
-    # Check if overlapping part satisfies m2
-    seq_read_R = seqs[read_R-1]+seqs[read_R]
-    seq_next_read_R = seqs[next_read_R-1]+seqs[next_read_R]
-    next_read_overlap = len(seq_next_read_R)+offset-group.readROffset
-    overlapLength = min(next_read_overlap, len(seqs[read_R]))
-    start = len(seq_next_read_R) - next_read_overlap
 
-
-    #   PRE             OVERLAP
-    #   ACGTAGGGATGAGGA GAGAGAGAGAGAGAG     consensus
-    #      TAGGGATGAGGA GAGAGA
-    # A ACGTAGGGATGAGGA GAGAGA
+    newGroup = RightPartGroup(group.consensus)
 
     if offset > 0:
         j = offset
@@ -1760,13 +1772,20 @@ def createNewGroup(group, seqs, read_R, next_read_R, offset, log):
         j = 0
         k = -offset
 
-    newGroup = RightPartGroup(group.consensus)
+    # if next_read_R == 1805:
+    #     print next_read_R
+    #     print "LOL-NEW"
+    #     print group.mismatches
+    #     print newGroup.mismatches
+    #     print mismatches
+    #     print
 
     # Update main-consensus
     for i in xrange(len(seq_next_read_R)-k):
         bp = seq_next_read_R[i+k]
         newGroup.consensus[i+j][bp] = newGroup.consensus[i+j].get(bp, 0) + 1
 
+    # Update pre-consensus if any
     for i in xrange(k):
         bp = seq_next_read_R[i]
         newGroup.preConsensus.append({bp:1})
@@ -1774,7 +1793,210 @@ def createNewGroup(group, seqs, read_R, next_read_R, offset, log):
     global c2
     c2 += 1
     newGroup.rightParts[next_read_R] = set([offset])
+    newGroup.mismatches = mismatches
+    if len(mismatches) > M2:
+        print mismatches
     group.rightPartGroups.append(newGroup)
+
+
+def addToGroup(group, rightPartGroup, seqs, read_R, next_read_R, offset, mismatches, m2):
+    global c4
+    c4 += 1
+    seq_next_read_R = seqs[next_read_R-1]+seqs[next_read_R]
+    seq_read_R = seqs[read_R-1]+seqs[read_R]
+
+    #all_mismatches = set([mis for mis in mismatches])
+    all_mismatches = copy.deepcopy(mismatches)
+
+    # Computes the length of the pre-consensus extension, if any
+    lenPreConsensus = len(rightPartGroup.preConsensus)
+    toExtend = -(lenPreConsensus + (group.readROffset -
+                len(seqs[next_read_R-1]) + offset))
+    
+    # if next_read_R == 11035:
+    #     print lenPreConsensus, group.readROffset, len(seqs[next_read_R-1]), offset
+    #     print "ext", toExtend
+
+
+    if toExtend > 0:
+        """
+        Case 1 - extending pre-consensus:
+         GAG TTATCATTGTGACTGGACAAAGTACG
+        GGAG TTATCATTGTGACTGGACAAA
+        """
+        beginning = lenPreConsensus
+        j = 0
+        l = 0
+    elif offset > 0:
+        """
+        Case 2 - no pre consensus access:
+        GAG TTATCATTGTGACTGGACAAAGTACG
+               TCATTGTGACTGGACAAA
+        """
+        beginning = 0
+        j = offset
+        toExtend = 0
+    else:  # offset <= 0
+        """
+        Case 3 - touching pre-consensus:
+        GAG TTATCATTGTGACTGGACAAAGTACG
+         AG TTATCATTGTGACTGGACAAA
+        """
+        # preconsensus already checked, start offset in read_k
+        beginning = -offset
+        # if read_k aligns in middle of consensus
+        j = 0
+        # Offset in preConsensus
+        l = lenPreConsensus+offset
+        # No extension
+        toExtend = 0
+
+    # Check consensus
+    start = beginning + toExtend
+    for i in xrange(group.leftReadsOffset-j):
+        if seq_read_R[i+j] != seq_next_read_R[i+start]:
+            all_mismatches.add(i+j)
+            if len(all_mismatches) > m2:
+                return True
+
+    # Check consensus
+    # start = beginning + toExtend
+    # for i in xrange(group.leftReadsOffset-j):
+    #     if len(rightPartGroup.consensus[i+j]) > 1 or \
+    #            rightPartGroup.consensus[i+j].iterkeys().next() \
+    #            != seq_next_read_R[i+start]:
+    #         all_mismatches.add(i+j)
+    #         if len(all_mismatches) > m2:
+    #             return False
+            # print read_R
+            # print next_read_R
+            # print "hej"
+            # print " "*-offset,
+            # print_fullConsensus(rightPartGroup.preConsensus, rightPartGroup.consensus)
+            # print " "*offset, seq_next_read_R
+            # print offset
+            # if len(all_mismatches) > m2:
+            #     print "hej2"
+            #     print
+            #     return False
+            # print
+
+
+    # Check pre-consensus
+    for i in xrange(beginning):
+        if len(rightPartGroup.preConsensus[i+l]) > 1 or \
+               rightPartGroup.preConsensus[i+l].iterkeys().next() \
+               != seq_next_read_R[i+toExtend]:
+            all_mismatches.add(len(rightPartGroup.preConsensus)-(i+l))
+            if len(all_mismatches) > m2:
+                # if next_read_R == 11035:
+                #     print lenPreConsensus
+                #     print "hej"
+                #     print offset
+                #     print toExtend
+                #     print beginning
+                #     print all_mismatches
+                #     print_fullConsensus(rightPartGroup.preConsensus, rightPartGroup.consensus)
+                #     print next_read_R
+                return False
+
+
+    # Add existing mismatches
+    # for mis in group.mismatches:
+    #     all_mismatches.add(mis)
+    for mis in rightPartGroup.mismatches:
+        all_mismatches.add(mis)
+
+    if len(all_mismatches) > m2:
+        return False
+
+    # Update pre-consensus
+    for i in xrange(beginning):
+        bp = seq_next_read_R[i+toExtend]
+        rightPartGroup.preConsensus[i+l][bp] = \
+            rightPartGroup.preConsensus[i+l].get(bp, 0)+1
+
+    # Update main-consensus
+    for i in xrange(len(seq_next_read_R)-start):
+        bp = seq_next_read_R[i+start]
+        rightPartGroup.consensus[i+j][bp] = \
+            rightPartGroup.consensus[i+j].get(bp, 0) + 1
+
+    # Extend pre-consensus if required
+    if toExtend > 0:
+        prePart = [{seq_next_read_R[i]:1} for i in xrange(toExtend)]
+        rightPartGroup.preConsensus = \
+            prePart + rightPartGroup.preConsensus
+
+    # Add read to group
+    global c2
+    c2 += 1
+    # if next_read_R == 3449:
+    #     print next_read_R
+    #     print "LOL"
+    #     print group.mismatches
+    #     print rightPartGroup.mismatches
+    #     print
+    if next_read_R in rightPartGroup.rightParts:
+        rightPartGroup.rightParts[next_read_R].add(offset)
+    else:
+        rightPartGroup.rightParts[next_read_R] = set([offset])
+
+    rightPartGroup.mismatches = all_mismatches
+    return True
+
+
+def testRead(group, seqs, read_R, next_read_R, offset, m2, log):
+    seq_read_R = seqs[read_R-1]+seqs[read_R]
+    seq_next_read_R = seqs[next_read_R-1]+seqs[next_read_R]
+
+    # Check overlapping part
+    lenToCompare = len(seq_next_read_R) - (group.leftReadsOffset - offset)
+    mismatches = set([mis for mis in group.mismatches])
+    for i in xrange(lenToCompare):
+        # if next_read_R == 1805:
+        #     print "hejhej"
+        #     print group.consensus[group.leftReadsOffset+i].keys()[0], seq_next_read_R[i+group.leftReadsOffset-offset]
+        #     print group.leftReadsOffset+i
+        #     print group.leftReadsOffset
+        if len(group.consensus[group.leftReadsOffset+i]) > 1 or \
+                group.consensus[group.leftReadsOffset+i].iterkeys().next() \
+                != seq_next_read_R[i+group.leftReadsOffset-offset]:
+            mismatches.add(group.leftReadsOffset+i)
+            # if next_read_R == 1805:
+            #     #print " "*-offset,
+            #     print_fullConsensus([], group.consensus)
+            #     print " "*offset, seq_next_read_R
+            #     print offset
+            #     print "lololol"
+            #     print group.consensus[group.leftReadsOffset+i].keys()[0], seq_next_read_R[i+group.leftReadsOffset-offset]
+            if len(mismatches) > m2:
+                return False
+
+    added = False
+    # Check if it fits into existing groups
+    for rightPartGroup in group.rightPartGroups:
+        if addToGroup(group, rightPartGroup, seqs, read_R, next_read_R,
+                      offset, mismatches, m2):
+            added = True
+            break
+    
+    if not added:
+        # Check rest against anchor
+        if offset > 0:
+            j = offset
+            k = 0
+        else:
+            j = 0
+            k = -offset
+        for i in xrange(group.leftReadsOffset-j):
+            if seq_read_R[i+j] != seq_next_read_R[i+k]:
+                mismatches.add(i+j)
+                if len(mismatches) > m2:
+                    return False
+        
+        createNewGroup(group, next_read_R, seq_next_read_R, offset,
+                       mismatches)
 
 
 def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
@@ -1793,22 +2015,32 @@ def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
                             offset += group.readROffset - \
                                       len(seqs[next_read_R-1])
                             
-                            mis = dismissRead(group, seqs, next_read_R,offset)
-                            
-                            if len(mis) > M2:
-                                group.checkedRightParts.add(next_read_R)
-                                continue
-                            
-                            added = False
-                            for rightPartGroup in group.rightPartGroups:
-                                added = fitsInGroup4(group, rightPartGroup,
-                                    seqs, read_R, next_read_R, offset, 
-                                    mis, M2)
+                            # print_fullConsensus([], group.consensus)
+                            # print " "*-offset, seqs[read_R-1]+seqs[read_R]
+                            # print " "*offset, seqs[next_read_R-1]+seqs[next_read_R]
+                            #
+                            # print "offset", offset
 
-                            # if not added:
-                            if len(group.rightPartGroups) == 0:
-                                createNewGroup(group, seqs, read_R,
-                                               next_read_R, offset, M2)
+                            # mis = dismissRead(group, seqs, next_read_R,offset)
+                            #
+                            # if len(mis) > M2:
+                            #     group.checkedRightParts.add(next_read_R)
+                            #     continue
+                            #
+                            # added = False
+                            # for rightPartGroup in group.rightPartGroups:
+                            #     added = fitsInGroup4(group, rightPartGroup,
+                            #         seqs, read_R, next_read_R, offset,
+                            #         mis, M2)
+                            #
+                            # # if not added:
+                            # if len(group.rightPartGroups) == 0:
+                            #     seq_next_read_R = seqs[next_read_R-1]+seqs[next_read_R]
+                            #     createNewGroup(group, next_read_R,
+                            #             seq_next_read_R, offset, mis)
+
+                            testRead(group, seqs, read_R, next_read_R,
+                                     offset, M2, log)
 
                             group.checkedRightParts.add(next_read_R)
 
