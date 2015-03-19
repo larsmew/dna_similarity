@@ -374,6 +374,8 @@ def computeShinglesTable(fasta_file, shinglesPos, k, log):
     Computes a table for fast look-up of k-shingles and their corresponding
     position in the reads - when it was first encountered in the fasta file.
     """
+    if not fasta_file:
+        return shinglesPos
     logprint(log, True, "Computing table of shingles positions...")
     tim = time.clock()
     with open(fasta_file, "rU") as fasta_file:
@@ -467,38 +469,41 @@ def getAllReads(fasta_file, log):
     """
     Extract the reads (DNA sequences) from the given fasta file.
     """
-    with open(fasta_file, "rU") as fasta_file:
-        read = ""
-        tim = time.clock()
-        logprint(log, False, "Collecting reads...")
-        reads = []
-        seqs = 0
-        for line in fasta_file:
-            # If line starts with ">", which indicates end of a sequence, append it to list of reads
-            if line.startswith(">"):
-                if read != "":
-                    seqs += 1
-                    # Splits the string into two parts
-                    leftpart = read[:len(read)/2]
-                    rightpart = read[len(read)/2:]
-                    reads.append(leftpart)
-                    reads.append(rightpart)
-                    read = ""
-            # Concatenate multi-line sequences into one string
-            else:
-                read += line.strip().upper()
-        if read != "":
-            seqs += 1
-            leftpart = read[:len(read)/2]
-            rightpart = read[len(read)/2:]
-            reads.append(leftpart)
-            reads.append(rightpart)
+    if fasta_file:
+        with open(fasta_file, "rU") as fasta_file:
+            read = ""
+            tim = time.clock()
+            logprint(log, False, "Collecting reads...")
+            reads = []
+            seqs = 0
+            for line in fasta_file:
+                # If line starts with ">", which indicates end of a sequence, append it to list of reads
+                if line.startswith(">"):
+                    if read != "":
+                        seqs += 1
+                        # Splits the string into two parts
+                        leftpart = read[:len(read)/2]
+                        rightpart = read[len(read)/2:]
+                        reads.append(leftpart)
+                        reads.append(rightpart)
+                        read = ""
+                # Concatenate multi-line sequences into one string
+                else:
+                    read += line.strip().upper()
+            if read != "":
+                seqs += 1
+                leftpart = read[:len(read)/2]
+                rightpart = read[len(read)/2:]
+                reads.append(leftpart)
+                reads.append(rightpart)
 
         logprint(log, False, "Finished reading in",
                  (time.clock() - tim) / 60, "minutes")
         logprint(log, False, "Found", seqs, "sequences in fasta file")
         logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
         return reads
+    else:
+        return []
 
 
 def getPartsFromFile(fasta_file, log):
@@ -506,26 +511,27 @@ def getPartsFromFile(fasta_file, log):
     Makes a generator object of all left- and right-parts of all reads
     in the given fasta file.
     """
-    with open(fasta_file, "rU") as fasta_file:
-        read = ""
-        for line in fasta_file:
-            # If line starts with ">", which indicates end of a sequence, append it to list of reads
-            if line.startswith(">"):
-                if read != "":
-                    # Splits the string into two parts
-                    leftpart = read[:len(read)/2]
-                    yield leftpart
-                    rightpart = read[len(read)/2:]
-                    yield rightpart
-                    read = ""
-            # Concatenate multi-line sequences into one string
-            else:
-                read += line.strip().upper()
-        if read != "":
-            leftpart = read[:len(read)/2]
-            yield leftpart
-            rightpart = read[len(read)/2:]
-            yield rightpart
+    if fasta_file:  
+        with open(fasta_file, "rU") as fasta_file:
+            read = ""
+            for line in fasta_file:
+                # If line starts with ">", which indicates end of a sequence, append it to list of reads
+                if line.startswith(">"):
+                    if read != "":
+                        # Splits the string into two parts
+                        leftpart = read[:len(read)/2]
+                        yield leftpart
+                        rightpart = read[len(read)/2:]
+                        yield rightpart
+                        read = ""
+                # Concatenate multi-line sequences into one string
+                else:
+                    read += line.strip().upper()
+            if read != "":
+                leftpart = read[:len(read)/2]
+                yield leftpart
+                rightpart = read[len(read)/2:]
+                yield rightpart
 
 
 def isPrime(n):
@@ -588,7 +594,7 @@ def runLSH(normal, diseased, bands, rows, n, k, seed, minhash_alg, log):
             6. Doc shingles - Ongoing hash function
     """
     # Check if files are provided
-    if normal and diseased:
+    if normal or diseased:
         tim = time.clock()
         random.seed(seed)
         candidatePairs = dict()
@@ -758,7 +764,7 @@ def lshBand(buckets, b, candidatePairs, log):
     # print "Finished LSH for band", b, "in", (time.clock() - tim) / 60, \
     #       "minutes"
 
-    print len(candidatePairs)
+    # print len(candidatePairs)
 
     return None
 
