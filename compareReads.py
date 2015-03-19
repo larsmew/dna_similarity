@@ -17,7 +17,15 @@ import json
 import cPickle as pickle
 import csv
 
+""" global variables """
+# LSH
+printMinhashProcess = 500000
+secondSample = 0
+# Sequence Alignment
+M1 = 1
+M2 = 1
 
+# Test variables
 c1 = 0
 c2 = 0
 c3 = 0
@@ -27,11 +35,8 @@ c6 = 0
 c7 = 0
 numreadL = 0
 numreadR = 0
-M1 = 1
-M2 = 1
 
 old = False
-secondSample = 0
 
 # ************************************************************************** #
 #                                                                            #
@@ -60,7 +65,7 @@ def optionParse():
                       action="store",
                       dest="normal_file",
                       help="set <FILENAME> as normal reads sample.")
-                      
+
     parser.add_option("-d", "--diseased",
                       metavar="<FILENAME>",
                       action="store",
@@ -671,6 +676,11 @@ def minhashing(normal, diseased, shingles, buckets, k, rows, minhash_alg, bn, bs
             minhashing_alg6(part, idx, shingles, buckets, k, rows, p, a, b)
         idx += 1
 
+        if idx % printMinhashProcess == 0:
+            logprint(log, True, "Band", bn+1, "of", str(bs)+":",
+                     "Processed", idx, "documents in",
+                     (time.clock() - tim) / 60, "minutes")
+
     global secondSample
     if secondSample == 0:
         secondSample = idx
@@ -691,7 +701,7 @@ def minhashing(normal, diseased, shingles, buckets, k, rows, minhash_alg, bn, bs
 
         idx += 1
 
-        if idx % 500000 == 0:
+        if idx % printMinhashProcess == 0:
             logprint(log, True, "Band", bn+1, "of", str(bs)+":",
                      "Processed", idx, "documents in",
                      (time.clock() - tim) / 60, "minutes")
@@ -738,7 +748,7 @@ def lshBand(buckets, b, candidatePairs, log):
     logprint(log, True, "Number of buckets in band", str(b)+":", len(buckets))
     numPairs = 0
     for bucket in buckets:
-        print buckets[bucket]
+        # print buckets[bucket]
         numPairs += len(buckets[bucket]) * (len(buckets[bucket])-1) / 2
     logprint(log, False, "Number of candidate pairs in band", str(b)+":",
              numPairs)
@@ -747,7 +757,7 @@ def lshBand(buckets, b, candidatePairs, log):
 
     # print "Finished LSH for band", b, "in", (time.clock() - tim) / 60, \
     #       "minutes"
-    
+
     print len(candidatePairs)
 
     return None
@@ -1256,7 +1266,7 @@ class AlignedGroup(object):
     readROffset = 0
     consensusMain = 0  # read_R
     # reads in group coming from left part - Normal sample
-    leftPartsN = dict()  
+    leftPartsN = dict()
     # reads in group coming from left part - Diseased sample
     leftPartsD = dict()
     leftReadsOffset = 0
@@ -1423,7 +1433,7 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
             # Align right parts
             alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log)
 
-            print_alignedGroups(alignedGroups, read_R, seqs, log)
+            # print_alignedGroups(alignedGroups, read_R, seqs, log)
             # sys.exit()
 
             prog += 1
@@ -2102,7 +2112,7 @@ def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
                     else:
                         for alignInfo in findAlignment(seqs[next_read_R],
                                     seqs[read_L], group.readROffset, 0, log):
-                            for offset2 in (group.leftPartsN[read_L] + 
+                            for offset2 in (group.leftPartsN[read_L] +
                                             group.leftPartsD[read_L]):
                                 # global numreadR
                                 # numreadR += 1
