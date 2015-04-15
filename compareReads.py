@@ -511,7 +511,7 @@ def getPartsFromFile(fasta_file, log):
     Makes a generator object of all left- and right-parts of all reads
     in the given fasta file.
     """
-    if fasta_file:  
+    if fasta_file:
         with open(fasta_file, "rU") as fasta_file:
             read = ""
             for line in fasta_file:
@@ -1413,7 +1413,7 @@ def print_alignedGroups(groups, read_R, seqs, log):
                 #          for consensus in group.consensus))
                 print_fullConsensus([], group.consensus, log)
                 if read_R < secondSample:
-                    logprint(log, False, "", 
+                    logprint(log, False, "",
                              seqs[read_R-1]+""+seqs[read_R]+"*")
                 for read_L in group.leftPartsN:
                     for offset in group.leftPartsN[read_L]:
@@ -1421,7 +1421,7 @@ def print_alignedGroups(groups, read_R, seqs, log):
                                  group.readROffset),
                                  seqs[read_L]+""+seqs[read_L+1])
                 if read_R >= secondSample:
-                    logprint(log, False, "", 
+                    logprint(log, False, "",
                              seqs[read_R-1]+""+seqs[read_R]+"*")
                 for read_L in group.leftPartsD:
                     for offset in group.leftPartsD[read_L]:
@@ -1452,12 +1452,12 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
 
             # Align right parts
             alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log)
-            
+
             # Analyze the aligned group to find mutations
-            for group in alignedGroups:
-                for rightPartGroup in group.rightPartGroups:
-                    if len(rightPartGroup.mismatches) > 0:
-                        findMutation(read_R, seqs, group, rightPartGroup, log)
+            # for group in alignedGroups:
+            #     for rightPartGroup in group.rightPartGroups:
+            #         if len(rightPartGroup.mismatches) > 0:
+            #             findMutation(read_R, seqs, group, rightPartGroup, log)
 
             print_alignedGroups(alignedGroups, read_R, seqs, log)
             # sys.exit()
@@ -2050,7 +2050,7 @@ def addToGroup(group, rightPartGroup, seqs, read_R, next_read_R, offset, mismatc
     return True
 
 
-def testRead(group, seqs, read_R, next_read_R, offset, m2, log):
+def testRead(group, seqs, read_R, next_read_R, offset, m2, alignments, log):
     seq_read_R = seqs[read_R-1]+seqs[read_R]
     seq_next_read_R = seqs[next_read_R-1]+seqs[next_read_R]
 
@@ -2075,7 +2075,7 @@ def testRead(group, seqs, read_R, next_read_R, offset, m2, log):
             #     print "lololol"
             #     print group.consensus[group.leftReadsOffset+i].keys()[0], seq_next_read_R[i+group.leftReadsOffset-offset]
             if len(mismatches) > m2:
-                return False
+                return alignments
 
     # if next_read_R == 2097:
     #     print " "*-offset, seq_read_R
@@ -2100,7 +2100,7 @@ def testRead(group, seqs, read_R, next_read_R, offset, m2, log):
         if seq_read_R[i+j] != seq_next_read_R[i+k]:
             mismatches.add(i+j)
             if len(mismatches) > m2:
-                return False
+                return alignments
 
     added = False
     # Check if it fits into existing groups
@@ -2113,10 +2113,13 @@ def testRead(group, seqs, read_R, next_read_R, offset, m2, log):
     if not added:
         createNewGroup(group, next_read_R, seq_next_read_R, offset,
                        mismatches)
+    
+    return alignments + 1
 
 
 def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
     startOnePosOverlap = True
+    maxAlignments = 2
     for group in alignedGroups:
         # print group.leftReadsOffset
         # print group.maxLeftReadsOffset
@@ -2126,18 +2129,22 @@ def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
                 if read_R != next_read_R and \
                              next_read_R not in group.checkedRightParts:
                     if startOnePosOverlap:
+                        alignments = 0
                         seq_next_read_R = seqs[next_read_R-1] + \
                                           seqs[next_read_R]
                         st = group.maxLeftReadsOffset
-                        for offset in xrange(st-len(seq_next_read_R)+1, 
-                            group.readROffset):
+                        for offset in xrange(group.readROffset, 
+                                st-len(seq_next_read_R), -1):
                             # print "st:", st
                             # print "r_offset:", group.readROffset
                             global numreadR
                             numreadR += 1
-                            testRead(group, seqs, read_R, next_read_R,
-                                     offset, M2, log)
+                            alignments = testRead(group, seqs, read_R,
+                                                  next_read_R, offset, M2,
+                                                  alignments, log)
                             group.checkedRightParts.add(next_read_R)
+                            if alignments == 2:
+                                break
                     else:
                         for alignInfo in findAlignment(seqs[next_read_R],
                                     seqs[read_L], group.readROffset, 0, log):
@@ -2169,7 +2176,7 @@ def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
                                 #             seq_next_read_R, offset, mis)
 
                                 testRead(group, seqs, read_R, next_read_R,
-                                         offset, M2, log)
+                                         offset, M2, alignments, log)
                                 group.checkedRightParts.add(next_read_R)
 
 
@@ -2386,7 +2393,7 @@ def main():
             output = "candidate_pairs_k_"+str(k)+"_b_"+str(bands)+"_r_"+ \
                      str(rows)+"_m_"+str(minhash_alg)
             exportCandidatePairs(candidatePairs, output_file, log)
-        
+
         sequenceAlignment(candidatePairs, normal_file, diseased_file, log)
         #seqAlignAllReads(fasta_file, log)
 
