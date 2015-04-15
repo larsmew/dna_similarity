@@ -2386,7 +2386,7 @@ def main():
             output = "candidate_pairs_k_"+str(k)+"_b_"+str(bands)+"_r_"+ \
                      str(rows)+"_m_"+str(minhash_alg)
             exportCandidatePairs(candidatePairs, output_file, log)
-
+        
         sequenceAlignment(candidatePairs, normal_file, diseased_file, log)
         #seqAlignAllReads(fasta_file, log)
 
