@@ -1446,7 +1446,7 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
     tim = time.clock()
     for read_R in candidatePairs:
         if read_R % 2 == 1:
-        # if read_R == 11:
+        # if read_R == 1093:
             alignedGroups = []
 
             # Align left parts
@@ -1456,6 +1456,7 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
             alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log)
 
             # Analyze the aligned group to find mutations
+            # print_alignedGroups(alignedGroups, read_R, seqs, log)
             for group in alignedGroups:
                 for rightPartGroup in group.rightPartGroups:
                     if len(rightPartGroup.mismatches) > 0:
@@ -2221,7 +2222,7 @@ def findMutation(read_R, seqs, leftparts, rightparts, mismatches, first, log):
                 if mutationsPos < offset:
                     continue
                 read = seqs[read_L]+seqs[read_L+1]
-                if mutationsPos > len(read)+offset:
+                if mutationsPos > len(read)+offset-1:
                     continue
                 # print read[mutationsPos-offset-1]
                 # print read[mutationsPos-offset]
@@ -2233,14 +2234,19 @@ def findMutation(read_R, seqs, leftparts, rightparts, mismatches, first, log):
                 if mutationsPos < offset:
                     continue
                 read = seqs[read_R-1]+seqs[read_R]
-                if mutationsPos > len(read)+offset:
+                if mutationsPos > len(read)+offset-1:
                     continue
                 # print mutationsPos-offset
                 # print read[mutationsPos-offset-1]
                 # print read[mutationsPos-offset]
                 # print read[mutationsPos-offset+1]
+                # print mutationsPos
+                # print offset
+                # print read_R
+                # print read
+                # print len(read)
                 firstSampleBP.add(read[mutationsPos-offset])
-        print firstSampleBP
+        # print firstSampleBP
         if len(firstSampleBP) == 1:
             return list(firstSampleBP)[0]
         else:
