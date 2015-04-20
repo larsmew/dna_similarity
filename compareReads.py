@@ -924,8 +924,8 @@ def minhashing_alg6(dna, idx, shingles, buckets, k, rows, p, a, b):
     Uses hash functions in the form ((a*pos+b) mod p) mod N,
     where a and b random integers and p is prime and p > N.
     Computes original position of shingle by finding all shingles and
-    enumerates them, then store them in a table for fast look up.
-    Tale is called shingles.
+    enumerating them, then store them in a table for fast look up.
+    Table is called shingles.
     """
     # Find signature for each document
     signature = []
@@ -947,6 +947,8 @@ def minhashing_alg6(dna, idx, shingles, buckets, k, rows, p, a, b):
         buckets[key].append(idx)
     else:
         buckets[key] = [idx]
+
+
 # ************************************************************************** #
 #                                                                            #
 #                             Similarity checkers                            #
@@ -1444,7 +1446,7 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
     tim = time.clock()
     for read_R in candidatePairs:
         if read_R % 2 == 1:
-        # if read_R == 55:
+        # if read_R == 11:
             alignedGroups = []
 
             # Align left parts
@@ -1454,12 +1456,22 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
             alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log)
 
             # Analyze the aligned group to find mutations
-            # for group in alignedGroups:
-            #     for rightPartGroup in group.rightPartGroups:
-            #         if len(rightPartGroup.mismatches) > 0:
-            #             findMutation(read_R, seqs, group, rightPartGroup, log)
+            for group in alignedGroups:
+                for rightPartGroup in group.rightPartGroups:
+                    if len(rightPartGroup.mismatches) > 0:
+                        mutation1 = findMutation(read_R, seqs,
+                                group.leftPartsN, rightPartGroup.rightPartsN,
+                                rightPartGroup.mismatches, True, log)
+                        # if mutation1 == "Fail":
+                        #     continue
+                        mutation2 = findMutation(read_R, seqs,
+                                group.leftPartsD, rightPartGroup.rightPartsD,
+                                rightPartGroup.mismatches, False, log)
+                        if mutation1 != mutation2 and mutation2 != "Fail":
+                            print_alignedGroups(alignedGroups, read_R,
+                                                seqs, log)
 
-            print_alignedGroups(alignedGroups, read_R, seqs, log)
+            # print_alignedGroups(alignedGroups, read_R, seqs, log)
             # sys.exit()
 
             prog += 1
@@ -2113,7 +2125,7 @@ def testRead(group, seqs, read_R, next_read_R, offset, m2, alignments, log):
     if not added:
         createNewGroup(group, next_read_R, seq_next_read_R, offset,
                        mismatches)
-    
+
     return alignments + 1
 
 
@@ -2133,7 +2145,7 @@ def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
                         seq_next_read_R = seqs[next_read_R-1] + \
                                           seqs[next_read_R]
                         st = group.maxLeftReadsOffset
-                        for offset in xrange(group.readROffset, 
+                        for offset in xrange(group.readROffset,
                                 st-len(seq_next_read_R), -1):
                             # print "st:", st
                             # print "r_offset:", group.readROffset
@@ -2189,51 +2201,50 @@ def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
 #          TCAGAA TGCCC
 #         TTCAGAA TGCC
 # 7 6 3 = 4
-def findMutation(read_R, seqs, group, rightPartGroup, log):
-    for mutationsPos in rightPartGroup.mismatches:
-        print mutationsPos
+def findMutation(read_R, seqs, leftparts, rightparts, mismatches, first, log):
+    # Test that the size of the group is big enough to infer any info
+    if len(leftparts)+len(rightparts) < 3:
+        return "Fail"
+    for mutationsPos in mismatches:
+        # print "mutPos", mutationsPos
         firstSampleBP = set()
-        secondSampleBP = set()
-        for read_L in group.leftPartsN:
-            for offset in group.leftPartsN[read_L]:
-                print offset
+        # Get bp in anchor point
+        if first and read_R < secondSample or \
+                not first and read_R > secondSample:
+            read = seqs[read_R-1]+seqs[read_R]
+            if mutationsPos > 0 and mutationsPos < len(read):
+                firstSampleBP.add(read[mutationsPos])
+        # Get bp in leftparts
+        for read_L in leftparts:
+            for offset in leftparts[read_L]:
+                offset += len(seqs[read_L])
                 if mutationsPos < offset:
                     continue
-                read = seqs[read_L-1]+seqs[read_L]
-                print len(seqs[read_L-1])
-                print len(read)
-                # if mutationsPos > len(read)+offset+len(seqs[read_L-1]):
-                #     continue
-                firstSampleBP.add(read[mutationsPos-offset-len(seqs[read_L-1])])
-        for read_R in rightPartGroup.rightPartsN:
-            for offset in rightPartGroup.rightPartsN[read_R]:
-                print offset
-                if mutationsPos < offset:
-                    continue
-                read = seqs[read_L-1]+seqs[read_L]
+                read = seqs[read_L]+seqs[read_L+1]
                 if mutationsPos > len(read)+offset:
                     continue
+                # print read[mutationsPos-offset-1]
+                # print read[mutationsPos-offset]
+                # print read[mutationsPos-offset+1]
                 firstSampleBP.add(read[mutationsPos-offset])
-        for read_L in group.leftPartsD:
-            for offset in group.leftPartsD[read_L]:
-                print offset
+        # Get bp in rightparts
+        for read_R in rightparts:
+            for offset in rightparts[read_R]:
                 if mutationsPos < offset:
                     continue
-                read = seqs[read_L-1]+seqs[read_L]
-                # if mutationsPos > len(read)+offset:
-                #     continue
-                secondSampleBP.add(read[mutationsPos-offset-len(seqs[read_L-1])])
-        for read_R in rightPartGroup.rightPartsD:
-            for offset in rightPartGroup.rightPartsD[read_R]:
-                print offset
-                if mutationsPos < offset:
-                    continue
-                read = seqs[read_L-1]+seqs[read_L]
+                read = seqs[read_R-1]+seqs[read_R]
                 if mutationsPos > len(read)+offset:
                     continue
-                secondSampleBP.add(read[mutationsPos-offset])
+                # print mutationsPos-offset
+                # print read[mutationsPos-offset-1]
+                # print read[mutationsPos-offset]
+                # print read[mutationsPos-offset+1]
+                firstSampleBP.add(read[mutationsPos-offset])
         print firstSampleBP
-        print secondSampleBP
+        if len(firstSampleBP) == 1:
+            return list(firstSampleBP)[0]
+        else:
+            return "Fail"
 
 
 # ************************************************************************** #
