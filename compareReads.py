@@ -1464,8 +1464,8 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
                         mutation1 = findMutation(read_R, seqs,
                                 group.leftPartsN, rightPartGroup.rightPartsN,
                                 rightPartGroup.mismatches, True, log)
-                        # if mutation1 == "Fail":
-                        #     continue
+                        if mutation1 == "Fail":
+                            continue
                         mutation2 = findMutation(read_R, seqs,
                                 group.leftPartsD, rightPartGroup.rightPartsD,
                                 rightPartGroup.mismatches, False, log)
