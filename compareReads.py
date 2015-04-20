@@ -1349,6 +1349,53 @@ def print_fullConsensus(preconsensus, consensus, log=None):
         else:
             break
 
+def print_alignedGroup(group, rightPartGroup, read_R, seqs, log):
+    logprint(log, False, "\nread_R:", read_R)
+    logprint(log, False, "Consensus:")
+    print_fullConsensus(rightPartGroup.preConsensus,
+                        rightPartGroup.consensus, log)
+    lenPre = len(rightPartGroup.preConsensus)
+    newOffset = lenPre + group.readROffset
+    # Print normal reads
+    if read_R < secondSample:
+        logprint(log, False, " " * lenPre,
+            seqs[read_R-1]+""+seqs[read_R]+"*")
+    for read_L in group.leftPartsN:
+        for offset in group.leftPartsN[read_L]:
+            logprint(log, False, " " * (newOffset +
+                 offset), seqs[read_L]+""+seqs[read_L+1])
+    for read_R2 in rightPartGroup.rightPartsN:
+        for offset in rightPartGroup.rightPartsN[read_R2]:
+            logprint(log, False, " " * (offset + lenPre),
+                     seqs[read_R2-1]+""+seqs[read_R2])
+    # Print diseased reads
+    logprint(log, False, "")
+    if read_R >= secondSample:
+        logprint(log, False, " " * lenPre,
+            seqs[read_R-1]+""+seqs[read_R]+"*")
+    for read_L in group.leftPartsD:
+        for offset in group.leftPartsD[read_L]:
+            logprint(log, False, " " * (newOffset +
+                 offset), seqs[read_L]+""+seqs[read_L+1])
+    for read_R2 in rightPartGroup.rightPartsD:
+        for offset in rightPartGroup.rightPartsD[read_R2]:
+            logprint(log, False, " " * (offset + lenPre),
+                     seqs[read_R2-1]+""+seqs[read_R2])
+    leftParts = group.leftPartsN.keys() + \
+                group.leftPartsD.keys()
+    logprint(log, False, "Left parts:",
+             sorted(list(leftParts)))
+    logprint(log, False, "Number of left parts:",
+             len(leftParts))
+    rightParts = rightPartGroup.rightPartsN.keys() + \
+                 rightPartGroup.rightPartsD.keys()
+    logprint(log, False, "Right parts:",
+             sorted(rightParts))
+    logprint(log, False, "Number of right parts:",
+             len(rightParts))
+    logprint(log, True, "mismatches:",
+             list(rightPartGroup.mismatches))
+
 
 def print_alignedGroups(groups, read_R, seqs, log):
     for group in groups:
@@ -1439,15 +1486,18 @@ def print_alignedGroups(groups, read_R, seqs, log):
 
 def sequenceAlignment(candidatePairs, normal, diseased, log):
     seqsNormal = getAllReads(normal, log)
+    global secondSample
+    secondSample = len(seqsNormal)
     seqsDiseased = getAllReads(diseased, log)
     seqs = seqsNormal + seqsDiseased
 
+    numUsefulGroups = 0
     numParts = len(candidatePairs) / 2
     prog = 0
     tim = time.clock()
     for read_R in candidatePairs:
         if read_R % 2 == 1:
-        # if read_R == 1093:
+        # if read_R == 42535:
             alignedGroups = []
 
             # Align left parts
@@ -1469,8 +1519,9 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
                         mutation2 = findMutation(read_R, seqs,
                                 group.leftPartsD, rightPartGroup.rightPartsD,
                                 rightPartGroup.mismatches, False, log)
-                        if mutation1 != mutation2 and mutation2 != "Fail":
-                            print_alignedGroups(alignedGroups, read_R,
+                        if mutation2 != "Fail" and mutation1 != mutation2:
+                            numUsefulGroups += 1
+                            print_alignedGroup(group, rightPartGroup, read_R,
                                                 seqs, log)
 
             # print_alignedGroups(alignedGroups, read_R, seqs, log)
@@ -1503,6 +1554,7 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
     logprint(log, False, "c7:", c7)
     logprint(log, False, "numReadL:", numreadL)
     logprint(log, False, "numReadR:", numreadR)
+    logprint(log, False, "numUsefulGroups:", numUsefulGroups)
 
 
 def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log):
@@ -1906,9 +1958,11 @@ def createNewGroup(group, next_read_R, seq_next_read_R, offset, mismatches):
     global c2
     c2 += 1
     if next_read_R < secondSample:
-        newGroup.rightPartsN[next_read_R] = set([offset])
+        #newGroup.rightPartsN[next_read_R] = set([offset])
+        newGroup.rightPartsN[next_read_R] = [offset]
     else:
-        newGroup.rightPartsD[next_read_R] = set([offset])
+        #newGroup.rightPartsD[next_read_R] = set([offset])
+        newGroup.rightPartsD[next_read_R] = [offset]
     newGroup.mismatches = mismatches
     if len(mismatches) > M2:
         print mismatches
@@ -2051,14 +2105,18 @@ def addToGroup(group, rightPartGroup, seqs, read_R, next_read_R, offset, mismatc
     #     print
     if next_read_R < secondSample:
         if next_read_R in rightPartGroup.rightPartsN:
-            rightPartGroup.rightPartsN[next_read_R].add(offset)
+            #rightPartGroup.rightPartsN[next_read_R].add(offset)
+            rightPartGroup.rightPartsN[next_read_R].append(offset)
         else:
-            rightPartGroup.rightPartsN[next_read_R] = set([offset])
+            #rightPartGroup.rightPartsN[next_read_R] = set([offset])
+            rightPartGroup.rightPartsN[next_read_R] = [offset]
     else:
         if next_read_R in rightPartGroup.rightPartsD:
-            rightPartGroup.rightPartsD[next_read_R].add(offset)
+            #rightPartGroup.rightPartsD[next_read_R].add(offset)
+            rightPartGroup.rightPartsD[next_read_R].append(offset)
         else:
-            rightPartGroup.rightPartsD[next_read_R] = set([offset])
+            #rightPartGroup.rightPartsD[next_read_R] = set([offset])
+            rightPartGroup.rightPartsD[next_read_R] = [offset]
 
     rightPartGroup.mismatches = all_mismatches
     return True
@@ -2205,8 +2263,9 @@ def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
 # 7 6 3 = 4
 def findMutation(read_R, seqs, leftparts, rightparts, mismatches, first, log):
     # Test that the size of the group is big enough to infer any info
-    if (len(leftparts)+len(rightparts)) < 3:
-        return "Fail"
+    # if (len(leftparts)+len(rightparts)) < 3:
+    #     return "Fail"
+    count = 0
     for mutationsPos in mismatches:
         # print "mutPos", mutationsPos
         firstSampleBP = set()
@@ -2228,13 +2287,14 @@ def findMutation(read_R, seqs, leftparts, rightparts, mismatches, first, log):
                 # print read[mutationsPos-offset-1]
                 # print read[mutationsPos-offset]
                 # print read[mutationsPos-offset+1]
+                count += 1
                 firstSampleBP.add(read[mutationsPos-offset])
         # Get bp in rightparts
-        for read_R in rightparts:
-            for offset in rightparts[read_R]:
+        for next_read_R in rightparts:
+            for offset in rightparts[next_read_R]:
                 if mutationsPos < offset:
                     continue
-                read = seqs[read_R-1]+seqs[read_R]
+                read = seqs[next_read_R-1]+seqs[next_read_R]
                 if mutationsPos > len(read)+offset-1:
                     continue
                 # print mutationsPos-offset
@@ -2246,9 +2306,10 @@ def findMutation(read_R, seqs, leftparts, rightparts, mismatches, first, log):
                 # print read_R
                 # print read
                 # print len(read)
+                count += 1
                 firstSampleBP.add(read[mutationsPos-offset])
-        if len(firstSampleBP) == 1:
-            logprint(log, False, "group mismatches:", firstSampleBP)
+        if len(firstSampleBP) == 1 and count > 1:
+            # logprint(log, False, "group mismatches:", firstSampleBP)
             return list(firstSampleBP)[0]
         else:
             return "Fail"
