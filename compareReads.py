@@ -1351,89 +1351,90 @@ def print_fullConsensus(preconsensus, consensus, log=None):
 
 
 def print_alignedGroups(groups, read_R, seqs, log):
-        for group in groups:
-            if len(group.rightPartGroups) > 0:
-                for rightPartGroup in group.rightPartGroups:
-                    if len(rightPartGroup.mismatches) > 0:
-                        logprint(log, False, "\nread_R:", read_R)
-                        logprint(log, False, "Consensus:")
-                        # logprint(log, False, "", ''.join(consensus.keys()[0]
-                        #         for consensus in group.preConsensus) + #" " +
-                        #         ''.join(consensus.keys()[0] for consensus
-                        #         in group.consensus))
-                        print_fullConsensus(rightPartGroup.preConsensus,
-                                            rightPartGroup.consensus, log)
-                        lenPre = len(rightPartGroup.preConsensus)
-                        newOffset = lenPre + group.readROffset
-                        # Print normal reads
-                        if read_R < secondSample:
-                            logprint(log, False, " " * lenPre,
-                                seqs[read_R-1]+""+seqs[read_R]+"*")
-                        for read_L in group.leftPartsN:
-                            for offset in group.leftPartsN[read_L]:
-                                logprint(log, False, " " * (newOffset +
-                                     offset), seqs[read_L]+""+seqs[read_L+1])
-                        for read_R2 in rightPartGroup.rightPartsN:
-                            for offset in rightPartGroup.rightPartsN[read_R2]:
-                                logprint(log, False, " " * (offset + lenPre),
-                                         seqs[read_R2-1]+""+seqs[read_R2])
-                        # Print diseased reads
-                        if read_R >= secondSample:
-                            logprint(log, False, " " * lenPre,
-                                seqs[read_R-1]+""+seqs[read_R]+"*")
-                        for read_L in group.leftPartsD:
-                            for offset in group.leftPartsD[read_L]:
-                                logprint(log, False, " " * (newOffset +
-                                     offset), seqs[read_L]+""+seqs[read_L+1])
-                        for read_R2 in rightPartGroup.rightPartsD:
-                            for offset in rightPartGroup.rightPartsD[read_R2]:
-                                logprint(log, False, " " * (offset + lenPre),
-                                         seqs[read_R2-1]+""+seqs[read_R2])
-                        leftParts = group.leftPartsN.keys() + \
-                                    group.leftPartsD.keys()
-                        logprint(log, False, "Left parts:",
-                                 sorted(list(leftParts)))
-                        logprint(log, False, "Number of left parts:",
-                                 len(leftParts))
-                        rightParts = rightPartGroup.rightPartsN.keys() + \
-                                     rightPartGroup.rightPartsD.keys()
-                        logprint(log, False, "Right parts:",
-                                 sorted(rightParts))
-                        logprint(log, False, "Number of right parts:",
-                                 len(rightParts))
-                        logprint(log, True, "mismatches:",
-                                 list(rightPartGroup.mismatches))
-                        # logprint(log, False, "Number of mismatches:",
-                        #          len(rightPartGroup.mismatches))
-                        # if len(group.mismatches) > 0:
-                        #     sys.exit()
-            # else:
-            elif len(group.mismatches) > 0:
-                logprint(log, False, "\nread_R:", read_R)
-                logprint(log, False, "Consensus:")
-                # logprint(log, False, "", ''.join(consensus.keys()[0]
-                #          for consensus in group.consensus))
-                print_fullConsensus([], group.consensus, log)
-                if read_R < secondSample:
-                    logprint(log, False, "",
-                             seqs[read_R-1]+""+seqs[read_R]+"*")
-                for read_L in group.leftPartsN:
-                    for offset in group.leftPartsN[read_L]:
-                        logprint(log, False, " " *(offset +
-                                 group.readROffset),
-                                 seqs[read_L]+""+seqs[read_L+1])
-                if read_R >= secondSample:
-                    logprint(log, False, "",
-                             seqs[read_R-1]+""+seqs[read_R]+"*")
-                for read_L in group.leftPartsD:
-                    for offset in group.leftPartsD[read_L]:
-                        logprint(log, False, " " *(offset +
-                                 group.readROffset),
-                                 seqs[read_L]+""+seqs[read_L+1])
-                logprint(log, False, "mismatches:", group.mismatches)
-                leftParts = group.leftPartsN.keys() + group.leftPartsD.keys()
-                logprint(log, False, "Left parts:", sorted(leftParts))
-                logprint(log, True, "Number of left parts:", len(leftParts))
+    for group in groups:
+        if len(group.rightPartGroups) > 0:
+            for rightPartGroup in group.rightPartGroups:
+                if len(rightPartGroup.mismatches) > 0:
+                    logprint(log, False, "\nread_R:", read_R)
+                    logprint(log, False, "Consensus:")
+                    # logprint(log, False, "", ''.join(consensus.keys()[0]
+                    #         for consensus in group.preConsensus) + #" " +
+                    #         ''.join(consensus.keys()[0] for consensus
+                    #         in group.consensus))
+                    print_fullConsensus(rightPartGroup.preConsensus,
+                                        rightPartGroup.consensus, log)
+                    lenPre = len(rightPartGroup.preConsensus)
+                    newOffset = lenPre + group.readROffset
+                    # Print normal reads
+                    if read_R < secondSample:
+                        logprint(log, False, " " * lenPre,
+                            seqs[read_R-1]+""+seqs[read_R]+"*")
+                    for read_L in group.leftPartsN:
+                        for offset in group.leftPartsN[read_L]:
+                            logprint(log, False, " " * (newOffset +
+                                 offset), seqs[read_L]+""+seqs[read_L+1])
+                    for read_R2 in rightPartGroup.rightPartsN:
+                        for offset in rightPartGroup.rightPartsN[read_R2]:
+                            logprint(log, False, " " * (offset + lenPre),
+                                     seqs[read_R2-1]+""+seqs[read_R2])
+                    # Print diseased reads
+                    logprint(log, False, "")
+                    if read_R >= secondSample:
+                        logprint(log, False, " " * lenPre,
+                            seqs[read_R-1]+""+seqs[read_R]+"*")
+                    for read_L in group.leftPartsD:
+                        for offset in group.leftPartsD[read_L]:
+                            logprint(log, False, " " * (newOffset +
+                                 offset), seqs[read_L]+""+seqs[read_L+1])
+                    for read_R2 in rightPartGroup.rightPartsD:
+                        for offset in rightPartGroup.rightPartsD[read_R2]:
+                            logprint(log, False, " " * (offset + lenPre),
+                                     seqs[read_R2-1]+""+seqs[read_R2])
+                    leftParts = group.leftPartsN.keys() + \
+                                group.leftPartsD.keys()
+                    logprint(log, False, "Left parts:",
+                             sorted(list(leftParts)))
+                    logprint(log, False, "Number of left parts:",
+                             len(leftParts))
+                    rightParts = rightPartGroup.rightPartsN.keys() + \
+                                 rightPartGroup.rightPartsD.keys()
+                    logprint(log, False, "Right parts:",
+                             sorted(rightParts))
+                    logprint(log, False, "Number of right parts:",
+                             len(rightParts))
+                    logprint(log, True, "mismatches:",
+                             list(rightPartGroup.mismatches))
+                    # logprint(log, False, "Number of mismatches:",
+                    #          len(rightPartGroup.mismatches))
+                    # if len(group.mismatches) > 0:
+                    #     sys.exit()
+        # else:
+        elif len(group.mismatches) > 0:
+            logprint(log, False, "\nread_R:", read_R)
+            logprint(log, False, "Consensus:")
+            # logprint(log, False, "", ''.join(consensus.keys()[0]
+            #          for consensus in group.consensus))
+            print_fullConsensus([], group.consensus, log)
+            if read_R < secondSample:
+                logprint(log, False, "",
+                         seqs[read_R-1]+""+seqs[read_R]+"*")
+            for read_L in group.leftPartsN:
+                for offset in group.leftPartsN[read_L]:
+                    logprint(log, False, " " *(offset +
+                             group.readROffset),
+                             seqs[read_L]+""+seqs[read_L+1])
+            if read_R >= secondSample:
+                logprint(log, False, "",
+                         seqs[read_R-1]+""+seqs[read_R]+"*")
+            for read_L in group.leftPartsD:
+                for offset in group.leftPartsD[read_L]:
+                    logprint(log, False, " " *(offset +
+                             group.readROffset),
+                             seqs[read_L]+""+seqs[read_L+1])
+            logprint(log, False, "mismatches:", group.mismatches)
+            leftParts = group.leftPartsN.keys() + group.leftPartsD.keys()
+            logprint(log, False, "Left parts:", sorted(leftParts))
+            logprint(log, True, "Number of left parts:", len(leftParts))
 
 
 def sequenceAlignment(candidatePairs, normal, diseased, log):
@@ -2204,7 +2205,7 @@ def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
 # 7 6 3 = 4
 def findMutation(read_R, seqs, leftparts, rightparts, mismatches, first, log):
     # Test that the size of the group is big enough to infer any info
-    if len(leftparts)+len(rightparts) < 3:
+    if (len(leftparts)+len(rightparts)) < 3:
         return "Fail"
     for mutationsPos in mismatches:
         # print "mutPos", mutationsPos
@@ -2246,8 +2247,8 @@ def findMutation(read_R, seqs, leftparts, rightparts, mismatches, first, log):
                 # print read
                 # print len(read)
                 firstSampleBP.add(read[mutationsPos-offset])
-        # print firstSampleBP
         if len(firstSampleBP) == 1:
+            logprint(log, False, "group mismatches:", firstSampleBP)
             return list(firstSampleBP)[0]
         else:
             return "Fail"
