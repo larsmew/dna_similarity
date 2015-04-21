@@ -13,14 +13,18 @@ import time
 import random
 import gc
 import copy
-import json
+import json, csv
 import cPickle as pickle
-import csv
+import math
 
 """ global variables """
 # LSH
+leftPartRatio = 0.5
+rightPartRatio = 0.5
 printMinhashProcess = 500000
 secondSample = 0
+
+
 # Sequence Alignment
 M1 = 1
 M2 = 1
@@ -519,18 +523,18 @@ def getPartsFromFile(fasta_file, log):
                 if line.startswith(">"):
                     if read != "":
                         # Splits the string into two parts
-                        leftpart = read[:len(read)/2]
+                        leftpart = read[:int(len(read)*leftPartRatio)]
                         yield leftpart
-                        rightpart = read[len(read)/2:]
+                        rightpart = read[int(len(read)*rightPartRatio):]
                         yield rightpart
                         read = ""
                 # Concatenate multi-line sequences into one string
                 else:
                     read += line.strip().upper()
             if read != "":
-                leftpart = read[:len(read)/2]
+                leftpart = read[:int(len(read)*leftPartRatio)]
                 yield leftpart
-                rightpart = read[len(read)/2:]
+                rightpart = read[int(len(read)*rightPartRatio):]
                 yield rightpart
 
 
@@ -1498,6 +1502,7 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
     for read_R in candidatePairs:
         if read_R % 2 == 1:
         # if read_R == 42535:
+        # if read_R == 19:
             alignedGroups = []
 
             # Align left parts
@@ -1571,7 +1576,8 @@ def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log):
             #print offset
             newGroup = True
             for group in alignedGroups:
-                if fitsInGroup(group, seqs, read_R, read_L, alignInfo, offset, M2):
+                if fitsInGroup(group, seqs, read_R, read_L, alignInfo,
+                               offset, M2):
                     # Add read_L to group
                     global c1
                     c1 += 1
@@ -1625,8 +1631,16 @@ def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log):
 
 
 def findAlignment(read_R, read_L, readROffset, m1, log):
-    offset = 0
     doPrint = False
+    leftPartSize = int(len(read_L)*leftPartRatio)
+    rightPartSize = int(math.ceil(len(read_R)*rightPartRatio))
+    # offset = leftPartSize
+    # if rightPartSize > leftPartSize:
+    #     offset += rightPartSize - leftPartSize
+    #     lengthToCompare = leftPartSize
+    # else:
+    #     lengthToCompare = rightPartSize
+    offset = 0
     if len(read_R) > len(read_L):
         offset = len(read_R) - len(read_L)
         lengthToCompare = len(read_L)
@@ -2195,7 +2209,8 @@ def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
     for group in alignedGroups:
         # print group.leftReadsOffset
         # print group.maxLeftReadsOffset
-        #ids = []
+        # ids = []
+        # group.mismatches = set()
         for read_L in (group.leftPartsN.keys()+group.leftPartsD.keys()):
             for next_read_R in candidatePairs[read_L]:
                 if read_R != next_read_R and \
