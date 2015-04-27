@@ -7,7 +7,9 @@ __version__ = "$Revision: 2.0"
 
 from optparse import OptionParser
 from operator import itemgetter
-from collections import Counter
+from collections import Counter, deque
+from itertools import chain
+from histogramCandPairs import histogram
 import sys
 import time
 import random
@@ -16,6 +18,10 @@ import copy
 import json, csv
 import cPickle as pickle
 import math
+try:
+    from reprlib import repr
+except ImportError:
+    pass
 
 """ global variables """
 # LSH
@@ -177,6 +183,47 @@ def memory_usage_resource():
         rusage_denom = rusage_denom * rusage_denom
     mem = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / rusage_denom
     return mem
+
+def total_size(o, handlers={}, verbose=False):
+    """ Returns the approximate memory footprint an object and all of its contents.
+
+    Automatically finds the contents of the following builtin containers and
+    their subclasses:  tuple, list, deque, dict, set and frozenset.
+    To search other containers, add handlers to iterate over their contents:
+
+        handlers = {SomeContainerClass: iter,
+                    OtherContainerClass: OtherContainerClass.get_elements}
+
+    """
+    dict_handler = lambda d: chain.from_iterable(d.items())
+    all_handlers = {tuple: iter,
+                    list: iter,
+                    deque: iter,
+                    dict: dict_handler,
+                    set: iter,
+                    frozenset: iter,
+                   }
+    all_handlers.update(handlers)  # user handlers take precedence
+    seen = set()  # track which object id's have already been seen
+    default_size = sys.getsizeof(0)  # estimate sizeof object without __sizeof__
+    def sizeof(o):
+        if id(o) in seen:       # do not double count the same object
+            return 0
+        seen.add(id(o))
+        s = sys.getsizeof(o, default_size)
+
+        if verbose:
+            #print(s, type(o), repr(o), file=stderr)
+            #logprint(log, False, "Memory usage of", o, type(o), repr(o))
+            print s, type(o), repr(o)
+
+        for typ, handler in all_handlers.items():
+            if isinstance(o, typ):
+                s += sum(map(sizeof, handler(o)))
+                break
+        return s
+
+    return sizeof(o)
 
 
 def logprint(log_file, flush, *output):
@@ -586,16 +633,6 @@ def runLSH(normal, diseased, bands, rows, n, k, seed, minhash_alg, log):
             4. First hash
             5. Through whole matrix (according to the book)
             6. Through all documents shingles
-
-        Type 1:
-            1. First hash - pre-computed hash functions
-            2. First hash - Ongoing hash function
-        Type 2:
-            3. Whole matrix - pre-computed hash functions
-            4. Whole matrix - Ongoing hash function
-        Type 3:
-            5. Doc shingles - pre-computed hash functions
-            6. Doc shingles - Ongoing hash function
     """
     # Check if files are provided
     if normal or diseased:
@@ -617,6 +654,7 @@ def runLSH(normal, diseased, bands, rows, n, k, seed, minhash_alg, log):
             shingles = computeShinglesSet(diseased, shingles, k, log)
         # Use Locality-Sensitive Hashing to compute for each bands the buckets
         # with similar documents (reads) obtained by minhashing each read.
+        #buckets = dict()
         for b in xrange(bands):
             buckets = dict()
             # minhashing(fasta_file, shingles, buckets, k, rows,
@@ -624,6 +662,11 @@ def runLSH(normal, diseased, bands, rows, n, k, seed, minhash_alg, log):
             minhashing(normal, diseased, shingles, buckets, k, rows,
                        minhash_alg, b, bands, log)
             lshBand(buckets, b, candidatePairs, log)
+            # logprint(log, False, "Size of buckets:",
+            #          total_size(buckets) / 1024, "KB")
+            # logprint(log, False, "Size of candidatePairs",
+            #          total_size(candidatePairs)/1024, "KB")
+            #buckets = dict()
             gc.collect()
         # buckets = dict()
         # minhashing(normal, diseased, shingles, buckets, k, rows,
@@ -638,7 +681,9 @@ def runLSH(normal, diseased, bands, rows, n, k, seed, minhash_alg, log):
                  sum(len(candidatePairs[i]) for i in candidatePairs)/2)
         logprint(log, False, "Finished LSH in",
                  (time.clock() - tim) / 60, "minutes")
-        logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
+        logprint(log, True, "Memory usage (in mb):", memory_usage_resource(),
+                 "\n")
+        # print "Size of candidatePairs", total_size(candidatePairs)/1024, "KB"
 
         return candidatePairs
 
@@ -1543,6 +1588,7 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
                 #c1 = 0
                 global c2
                 logprint(log, True, "right parts aligned:", c2)
+                logprint(log, True, "num useful groups:", numUsefulGroups)
                 #c2 = 0
                 #sys.exit()
                 gc.collect()
@@ -2487,6 +2533,9 @@ def main():
             output = "candidate_pairs_k_"+str(k)+"_b_"+str(bands)+"_r_"+ \
                      str(rows)+"_m_"+str(minhash_alg)
             exportCandidatePairs(candidatePairs, output_file, log)
+
+        # histogram(normal_file, k, bands, rows, candidatePairs)
+        # sys.exit()
 
         sequenceAlignment(candidatePairs, normal_file, diseased_file, log)
         #seqAlignAllReads(fasta_file, log)
