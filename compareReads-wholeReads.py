@@ -646,7 +646,7 @@ def runLSH(normal, diseased, bands, rows, n, k, seed, minhash_alg, log):
     """
     # Check if files are provided
     if normal or diseased:
-        reads = getAllReads(normal, log) + getAllReads(diseased, log)
+        # reads = getAllReads(normal, log) + getAllReads(diseased, log)
         tim = time.clock()
         random.seed(seed)
         candidatePairs = dict()
@@ -669,7 +669,7 @@ def runLSH(normal, diseased, bands, rows, n, k, seed, minhash_alg, log):
             buckets = dict()
             minhashing(normal, diseased, shingles, buckets, k, rows,
                        minhash_alg, b, bands, log)
-            lshBand(buckets, b, candidatePairs, reads, log)
+            lshBand(buckets, b, candidatePairs, log)
 
         logprint(log, False, "\nNumber of unique candidate pairs",
                  sum(len(candidatePairs[i]) for i in candidatePairs)/2)
@@ -764,7 +764,7 @@ def minhashing(normal, diseased, shingles, buckets, k, rows, minhash_alg, bn, bs
     return idx
 
 
-def lshBand(buckets, b, candidatePairs, reads, log):
+def lshBand(buckets, b, candidatePairs, log):
     tim = time.clock()
     logprint(log, True, "Running LSH and finding similar pairs...")
     numPairsUnique = 0
@@ -813,10 +813,10 @@ def lshBand(buckets, b, candidatePairs, reads, log):
     logprint(log, True, "Number of buckets in band", str(b)+":", len(buckets))
     numPairs = 0
     for bucket in buckets:
-        if len(buckets[bucket]) > 1:
-            print buckets[bucket]
-            for read in buckets[bucket]:
-                print reads[read]
+        # if len(buckets[bucket]) > 1:
+        #     print buckets[bucket]
+        #     for read in buckets[bucket]:
+        #         print reads[read]
         numPairs += len(buckets[bucket]) * (len(buckets[bucket])-1) / 2
     logprint(log, False, "Number of candidate pairs in band", str(b)+":",
              numPairs)
