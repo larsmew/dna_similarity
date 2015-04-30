@@ -9,7 +9,6 @@ from optparse import OptionParser
 from operator import itemgetter
 from collections import Counter, deque
 from itertools import chain
-#from histogramCandPairs import histogram
 import sys
 import time
 import random
@@ -438,34 +437,44 @@ def computeShinglesTable(fasta_file, shinglesPos, k, log):
             # Then, append it to list of reads
             if line.startswith(">"):
                 if read != "":
-                    # Splits the string into two parts
-                    leftpart = read[:len(read)/2]
-                    for shingle in getDocShingles(leftpart, k):
-                        if shingle not in shinglesPos:
-                            shinglesPos[shingle] = pos
-                            pos += 1
-                    rightpart = read[len(read)/2:]
-                    for shingle in getDocShingles(rightpart, k):
+                    for shingle in getDocShingles(read, k):
                         if shingle not in shinglesPos:
                             shinglesPos[shingle] = pos
                             pos += 1
                     read = ""
+                    
+                    # Splits the string into two parts
+                    # leftpart = read[:len(read)/2]
+                    # for shingle in getDocShingles(leftpart, k):
+                    #     if shingle not in shinglesPos:
+                    #         shinglesPos[shingle] = pos
+                    #         pos += 1
+                    # rightpart = read[len(read)/2:]
+                    # for shingle in getDocShingles(rightpart, k):
+                    #     if shingle not in shinglesPos:
+                    #         shinglesPos[shingle] = pos
+                    #         pos += 1
+                    # read = ""
             # Concatenate multi-line sequences into one string
             else:
                 read += line.strip().upper()
         # Compute shingles from last read
         if read != "":
+            for shingle in getDocShingles(read, k):
+                if shingle not in shinglesPos:
+                    shinglesPos[shingle] = pos
+                    # pos += 1
+
             # Splits the string into two parts
-            leftpart = read[:len(read)/2]
-            for shingle in getDocShingles(leftpart, k):
-                if shingle not in shinglesPos:
-                    shinglesPos[shingle] = pos
-                    pos += 1
-            rightpart = read[len(read)/2:]
-            for shingle in getDocShingles(rightpart, k):
-                if shingle not in shinglesPos:
-                    shinglesPos[shingle] = pos
-                    #pos += 1
+            # leftpart = read[:len(read)/2]
+            # for shingle in getDocShingles(leftpart, k):
+            #     if shingle not in shinglesPos:
+            #         shinglesPos[shingle] = pos
+            #         pos += 1
+            # rightpart = read[len(read)/2:]
+            # for shingle in getDocShingles(rightpart, k):
+            #     if shingle not in shinglesPos:
+            #         shinglesPos[shingle] = pos
 
         logprint(log, False, "Finished computation of shingles table in",
                  (time.clock() - tim) / 60, "minutes")
@@ -488,26 +497,32 @@ def computeShinglesSet(fasta_file, shingles, k, log):
             # Then, append it to list of reads
             if line.startswith(">"):
                 if read != "":
+                    for shingle in getDocShingles(read, k):
+                        shingles.add(shingle)
+
                     # Splits the string into two parts
-                    leftpart = read[:len(read)/2]
-                    for shingle in getDocShingles(leftpart, k):
-                        shingles.add(shingle)
-                    rightpart = read[len(read)/2:]
-                    for shingle in getDocShingles(rightpart, k):
-                        shingles.add(shingle)
+                    # leftpart = read[:len(read)/2]
+                    # for shingle in getDocShingles(leftpart, k):
+                    #     shingles.add(shingle)
+                    # rightpart = read[len(read)/2:]
+                    # for shingle in getDocShingles(rightpart, k):
+                    #     shingles.add(shingle)
                     read = ""
             # Concatenate multi-line sequences into one string
             else:
                 read += line.strip().upper()
         # Compute shingles from last read
         if read != "":
+            for shingle in getDocShingles(read, k):
+                shingles.add(shingle)
+
             # Splits the string into two parts
-            leftpart = read[:len(read)/2]
-            for shingle in getDocShingles(leftpart, k):
-                shingles.add(shingle)
-            rightpart = read[len(read)/2:]
-            for shingle in getDocShingles(rightpart, k):
-                shingles.add(shingle)
+            # leftpart = read[:len(read)/2]
+            # for shingle in getDocShingles(leftpart, k):
+            #     shingles.add(shingle)
+            # rightpart = read[len(read)/2:]
+            # for shingle in getDocShingles(rightpart, k):
+            #     shingles.add(shingle)
 
         logprint(log, False, "Finished shingling in", (time.clock() - tim) /
                  60, "minutes")
@@ -533,20 +548,22 @@ def getAllReads(fasta_file, log):
                     if read != "":
                         seqs += 1
                         # Splits the string into two parts
-                        leftpart = read[:len(read)/2]
-                        rightpart = read[len(read)/2:]
-                        reads.append(leftpart)
-                        reads.append(rightpart)
+                        # leftpart = read[:len(read)/2]
+                        # rightpart = read[len(read)/2:]
+                        # reads.append(leftpart)
+                        # reads.append(rightpart)
+                        reads.append(read)
                         read = ""
                 # Concatenate multi-line sequences into one string
                 else:
                     read += line.strip().upper()
             if read != "":
                 seqs += 1
-                leftpart = read[:len(read)/2]
-                rightpart = read[len(read)/2:]
-                reads.append(leftpart)
-                reads.append(rightpart)
+                reads.append(read)
+                # leftpart = read[:len(read)/2]
+                # rightpart = read[len(read)/2:]
+                # reads.append(leftpart)
+                # reads.append(rightpart)
 
         logprint(log, False, "Finished reading in",
                  (time.clock() - tim) / 60, "minutes")
@@ -569,20 +586,13 @@ def getPartsFromFile(fasta_file, log):
                 # If line starts with ">", which indicates end of a sequence, append it to list of reads
                 if line.startswith(">"):
                     if read != "":
-                        # Splits the string into two parts
-                        leftpart = read[:int(len(read)*leftPartRatio)]
-                        yield leftpart
-                        rightpart = read[int(len(read)*rightPartRatio):]
-                        yield rightpart
+                        yield read
                         read = ""
                 # Concatenate multi-line sequences into one string
                 else:
                     read += line.strip().upper()
             if read != "":
-                leftpart = read[:int(len(read)*leftPartRatio)]
-                yield leftpart
-                rightpart = read[int(len(read)*rightPartRatio):]
-                yield rightpart
+                yield read
 
 
 def isPrime(n):
@@ -636,6 +646,7 @@ def runLSH(normal, diseased, bands, rows, n, k, seed, minhash_alg, log):
     """
     # Check if files are provided
     if normal or diseased:
+        reads = getAllReads(normal, log) + getAllReads(diseased, log)
         tim = time.clock()
         random.seed(seed)
         candidatePairs = dict()
@@ -654,28 +665,11 @@ def runLSH(normal, diseased, bands, rows, n, k, seed, minhash_alg, log):
             shingles = computeShinglesSet(diseased, shingles, k, log)
         # Use Locality-Sensitive Hashing to compute for each bands the buckets
         # with similar documents (reads) obtained by minhashing each read.
-        #buckets = dict()
         for b in xrange(bands):
             buckets = dict()
-            # minhashing(fasta_file, shingles, buckets, k, rows,
-            #            minhash_alg, b, bands, log)
             minhashing(normal, diseased, shingles, buckets, k, rows,
                        minhash_alg, b, bands, log)
-            lshBand(buckets, b, candidatePairs, log)
-            # logprint(log, False, "Size of buckets:",
-            #          total_size(buckets) / 1024, "KB")
-            # logprint(log, False, "Size of candidatePairs",
-            #          total_size(candidatePairs)/1024, "KB")
-            #buckets = dict()
-            gc.collect()
-        # buckets = dict()
-        # minhashing(normal, diseased, shingles, buckets, k, rows,
-        #            minhash_alg, 1, bands, log)
-        # lshBand(buckets, 1, candidatePairs, log)
-
-        # Convert sets to lists for memory effciency
-        # for id1 in candidatePairs:
-        #     candidatePairs[id1] = list(candidatePairs[id1])
+            lshBand(buckets, b, candidatePairs, reads, log)
 
         logprint(log, False, "\nNumber of unique candidate pairs",
                  sum(len(candidatePairs[i]) for i in candidatePairs)/2)
@@ -683,7 +677,6 @@ def runLSH(normal, diseased, bands, rows, n, k, seed, minhash_alg, log):
                  (time.clock() - tim) / 60, "minutes")
         logprint(log, True, "Memory usage (in mb):", memory_usage_resource(),
                  "\n")
-        # print "Size of candidatePairs", total_size(candidatePairs)/1024, "KB"
 
         return candidatePairs
 
@@ -771,7 +764,7 @@ def minhashing(normal, diseased, shingles, buckets, k, rows, minhash_alg, bn, bs
     return idx
 
 
-def lshBand(buckets, b, candidatePairs, log):
+def lshBand(buckets, b, candidatePairs, reads, log):
     tim = time.clock()
     logprint(log, True, "Running LSH and finding similar pairs...")
     numPairsUnique = 0
@@ -781,33 +774,49 @@ def lshBand(buckets, b, candidatePairs, log):
             id1 = buckets[bucket][i]
             for j in xrange(i+1, len(buckets[bucket])):
                 id2 = buckets[bucket][j]
-                if id1 % 2 == 0 and id2 % 2 == 1:
-                    if id1 + 1 != id2:
-                        if id1 in candidatePairs:
-                            candidatePairs[id1].add(id2)
-                        else:
-                            candidatePairs[id1] = set([id2])
-                        if id2 in candidatePairs:
-                            candidatePairs[id2].add(id1)
-                        else:
-                            candidatePairs[id2] = set([id1])
-                        numPairsUnique += 1
-                if id1 % 2 == 1 and id2 % 2 == 0:
-                    if id1 - 1 != id2:
-                        if id1 in candidatePairs:
-                            candidatePairs[id1].add(id2)
-                        else:
-                            candidatePairs[id1] = set([id2])
-                        if id2 in candidatePairs:
-                            candidatePairs[id2].add(id1)
-                        else:
-                            candidatePairs[id2] = set([id1])
-                        numPairsUnique += 1
+                
+                if id1 in candidatePairs:
+                    candidatePairs[id1].add(id2)
+                else:
+                    candidatePairs[id1] = set([id2])
+                
+                if id2 in candidatePairs:
+                    candidatePairs[id2].add(id1)
+                else:
+                    candidatePairs[id2] = set([id1])
+                numPairsUnique += 1
+                
+                
+                # if id1 % 2 == 0 and id2 % 2 == 1:
+                #     if id1 + 1 != id2:
+                #         if id1 in candidatePairs:
+                #             candidatePairs[id1].add(id2)
+                #         else:
+                #             candidatePairs[id1] = set([id2])
+                #         if id2 in candidatePairs:
+                #             candidatePairs[id2].add(id1)
+                #         else:
+                #             candidatePairs[id2] = set([id1])
+                #         numPairsUnique += 1
+                # if id1 % 2 == 1 and id2 % 2 == 0:
+                #     if id1 - 1 != id2:
+                #         if id1 in candidatePairs:
+                #             candidatePairs[id1].add(id2)
+                #         else:
+                #             candidatePairs[id1] = set([id2])
+                #         if id2 in candidatePairs:
+                #             candidatePairs[id2].add(id1)
+                #         else:
+                #             candidatePairs[id2] = set([id1])
+                        
 
     logprint(log, True, "Number of buckets in band", str(b)+":", len(buckets))
     numPairs = 0
     for bucket in buckets:
-        # print buckets[bucket]
+        if len(buckets[bucket]) > 1:
+            print buckets[bucket]
+            for read in buckets[bucket]:
+                print reads[read]
         numPairs += len(buckets[bucket]) * (len(buckets[bucket])-1) / 2
     logprint(log, False, "Number of candidate pairs in band", str(b)+":",
              numPairs)
@@ -2534,8 +2543,7 @@ def main():
                      str(rows)+"_m_"+str(minhash_alg)
             exportCandidatePairs(candidatePairs, output_file, log)
 
-        # histogram(normal_file, k, bands, rows, candidatePairs)
-        # sys.exit()
+        sys.exit()
 
         sequenceAlignment(candidatePairs, normal_file, diseased_file, log)
         #seqAlignAllReads(fasta_file, log)
