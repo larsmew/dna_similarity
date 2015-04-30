@@ -2534,8 +2534,7 @@ def main():
                      str(rows)+"_m_"+str(minhash_alg)
             exportCandidatePairs(candidatePairs, output_file, log)
 
-        # histogram(normal_file, k, bands, rows, candidatePairs)
-        # sys.exit()
+        sys.exit()
 
         sequenceAlignment(candidatePairs, normal_file, diseased_file, log)
         #seqAlignAllReads(fasta_file, log)
