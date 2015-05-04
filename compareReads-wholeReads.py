@@ -763,7 +763,6 @@ def minhashing(normal, diseased, shingles, buckets, k, rows, minhash_alg, bn, bs
     logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
     return idx
 
-
 def lshBand(buckets, b, candidatePairs, log):
     tim = time.clock()
     logprint(log, True, "Running LSH and finding similar pairs...")
@@ -1554,7 +1553,7 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
     prog = 0
     tim = time.clock()
     for read_R in candidatePairs:
-        if read_R % 2 == 1:
+        if True:
         # if read_R == 42535:
         # if read_R == 19:
             alignedGroups = []
@@ -1618,13 +1617,11 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
 
 
 def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log):
-    readROffset = len(seqs[read_R-1])
+    readROffset = len(seqs[read_R][:len(seqs[read_R])/2])
     for read_L in candidatePairs[read_R]:
         #print seqs[read_R]
         #print seqs[read_L]
-        for alignInfo in findAlignment(seqs[read_R], seqs[read_L],
-                                         readROffset, M1, log):
-            #offset += len(seqs[read_R-1])
+        for alignInfo in findAlignment(seqs[read_R][len(seqs[read_R])/2:], seqs[read_L][:len(seqs[read_L])/2], readROffset, M1, log):
             offset, mis, lenCompared = alignInfo
             global numreadL
             numreadL += 1
@@ -1656,7 +1653,7 @@ def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log):
                 c7 += 1
                 group = AlignedGroup(read_R, readROffset, offset+readROffset)
                 # Start of extra part - offsetExtraPart
-                start = len(seqs[read_R]) - offset
+                start = len(seqs[read_R][len(seqs[read_R])/2:]) - offset
                 #group.consensusRight = seqs[read_L][start:] + seqs[read_L+1]
 
                 # Add read_L to new the group
@@ -1668,7 +1665,7 @@ def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log):
                 group.mismatches = mis
 
                 # Add anchor point to consensus
-                for bp in ''.join((seqs[read_R-1], seqs[read_R])):
+                for bp in seqs[read_R]:
                     group.consensus.append({bp:1})
 
                 # Add overlapping part of read_L to consensus
@@ -1678,7 +1675,7 @@ def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log):
                     group.consensus[i][bp] = group.consensus[i].get(bp, 0) + 1
 
                 # Add the rest of read_L to consensus
-                for bp in ''.join((seqs[read_L][start:], seqs[read_L+1])):
+                for bp in seqs[read_L][start:]:
                     group.consensus.append({bp:1})
 
                 # Append new group to the other groups
@@ -2041,8 +2038,8 @@ def createNewGroup(group, next_read_R, seq_next_read_R, offset, mismatches):
 def addToGroup(group, rightPartGroup, seqs, read_R, next_read_R, offset, mismatches, m2):
     global c4
     c4 += 1
-    seq_next_read_R = seqs[next_read_R-1]+seqs[next_read_R]
-    seq_read_R = seqs[read_R-1]+seqs[read_R]
+    seq_next_read_R = seqs[next_read_R]
+    seq_read_R = seqs[read_R]
 
     #all_mismatches = set([mis for mis in mismatches])
     all_mismatches = copy.deepcopy(mismatches)
@@ -2050,7 +2047,7 @@ def addToGroup(group, rightPartGroup, seqs, read_R, next_read_R, offset, mismatc
     # Computes the length of the pre-consensus extension, if any
     lenPreConsensus = len(rightPartGroup.preConsensus)
     toExtend = -(lenPreConsensus + (group.readROffset -
-                len(seqs[next_read_R-1]) + offset))
+                len(seqs[next_read_R][:next_read_R/2]) + offset))
 
     if toExtend > 0:
         """
@@ -2192,8 +2189,8 @@ def addToGroup(group, rightPartGroup, seqs, read_R, next_read_R, offset, mismatc
 
 
 def testRead(group, seqs, read_R, next_read_R, offset, m2, alignments, log):
-    seq_read_R = seqs[read_R-1]+seqs[read_R]
-    seq_next_read_R = seqs[next_read_R-1]+seqs[next_read_R]
+    seq_read_R = seqs[read_R]
+    seq_next_read_R = seqs[next_read_R]
 
     # Check overlapping part
     lenToCompare = len(seq_next_read_R) - (group.leftReadsOffset - offset)
@@ -2272,8 +2269,7 @@ def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
                              next_read_R not in group.checkedRightParts:
                     if startOnePosOverlap:
                         alignments = 0
-                        seq_next_read_R = seqs[next_read_R-1] + \
-                                          seqs[next_read_R]
+                        seq_next_read_R = seqs[next_read_R]
                         st = group.maxLeftReadsOffset
                         for offset in xrange(group.readROffset,
                                 st-len(seq_next_read_R), -1):
@@ -2544,7 +2540,6 @@ def main():
             exportCandidatePairs(candidatePairs, output_file, log)
 
         sys.exit()
-
         sequenceAlignment(candidatePairs, normal_file, diseased_file, log)
         #seqAlignAllReads(fasta_file, log)
 

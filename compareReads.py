@@ -17,6 +17,7 @@ import gc
 import copy
 import json, csv
 import cPickle as pickle
+import shelve
 import math
 try:
     from reprlib import repr
@@ -639,6 +640,7 @@ def runLSH(normal, diseased, bands, rows, n, k, seed, minhash_alg, log):
         tim = time.clock()
         random.seed(seed)
         candidatePairs = dict()
+        #candDisk = shelve.open("testDictDisk")
 
         # Computes table of all k-shingles and their position
         if minhash_alg == 3 or minhash_alg > 5:
@@ -657,6 +659,7 @@ def runLSH(normal, diseased, bands, rows, n, k, seed, minhash_alg, log):
         #buckets = dict()
         for b in xrange(bands):
             buckets = dict()
+            #candidatePairs = dict()
             # minhashing(fasta_file, shingles, buckets, k, rows,
             #            minhash_alg, b, bands, log)
             minhashing(normal, diseased, shingles, buckets, k, rows,
@@ -667,7 +670,14 @@ def runLSH(normal, diseased, bands, rows, n, k, seed, minhash_alg, log):
             # logprint(log, False, "Size of candidatePairs",
             #          total_size(candidatePairs)/1024, "KB")
             #buckets = dict()
-            gc.collect()
+            #gc.collect()
+            # for idx in candidatePairs:
+            #     try:
+            #         data = candDisk[idx]
+            #     except KeyError:
+            #         pass
+            #     candidatePairs[idx].add(data)
+            #     candDisk[idx] = candidatePairs[idx]
         # buckets = dict()
         # minhashing(normal, diseased, shingles, buckets, k, rows,
         #            minhash_alg, 1, bands, log)
@@ -692,11 +702,14 @@ def runLSH(normal, diseased, bands, rows, n, k, seed, minhash_alg, log):
         sys.exit()
 
 
-def getDocShingles(dna, k):
+def getDocShingles(dna, k, asSet=True):
     """
     Computes all shingles of size k in a document (dna sequence)
     """
-    shingles = {dna[i:i+k] for i in xrange(len(dna)-k+1)}
+    if asSet:
+        shingles = {dna[i:i+k] for i in xrange(len(dna)-k+1)}
+    else: # as list
+        shingles = [dna[i:i+k] for i in xrange(len(dna)-k+1)]
     return shingles
 
 
@@ -1003,6 +1016,108 @@ def minhashing_alg6(dna, idx, shingles, buckets, k, rows, p, a, b):
 #                             Similarity checkers                            #
 #                                                                            #
 # ************************************************************************** #
+def pairsFoundByLSH(normal, diseased, candidatePairs, k, b, r, log):
+    """
+    Check which pairs, with similarity above the threshold t, are found by
+    LSH and which are missed
+    """
+    seqsNormal = getAllReads(normal, log)
+    global secondSample
+    secondSample = len(seqsNormal)
+    seqsDiseased = getAllReads(diseased, log)
+    seqs = seqsNormal + seqsDiseased
+
+    path = "lshPairsVsAllPairs/"
+    f1 = open(path+"naive_pairs_all_readfa_b_"+str(b)+"_r_"+
+              str(r)+"_k_"+str(k)+".txt", 'w')
+    f2 = open(path+"jaccard_sets_pairs_all_readfa_b_"+str(b)+"_r_"+
+              str(r)+"_k_"+str(k)+".txt", 'w')
+    f3 = open(path+"jaccard_bags_pairs_all_readfa_b_"+str(b)+"_r_"+
+              str(r)+"_k_"+str(k)+".txt", 'w')
+    f4 = open(path+"naive_pairs_lsh_readfa_b_"+str(b)+"_r_"+
+              str(r)+"_k_"+str(k)+".txt", 'w')
+    f5 = open(path+"jaccard_sets_pairs_lsh_readfa_b_"+str(b)+"_r_"+
+              str(r)+"_k_"+str(k)+".txt", 'w')
+    f6 = open(path+"jaccard_bags_pairs_lsh_readfa_b_"+str(b)+"_r_"+
+              str(r)+"_k_"+str(k)+".txt", 'w')
+    
+
+    count = 0
+    numPairs = len(seqs) * (len(seqs)-1)
+    sims = dict()
+    truePairs_naive = set()
+    truePairs_sets = set()
+    truePairs_bags = set()
+    sim_threshold = 0.5
+    doPrint = False
+    tim = time.clock()
+    # Compute similarities for all pairs
+    for i in xrange(0,len(seqs),2):
+        for j in xrange(1, len(seqs),2):
+            if i+1 != j:
+                count += 1
+                naive = globalAlignment(seqs[i],seqs[j])
+                jaccard_sets = jaccardSim(seqs[i], seqs[j], k)
+                jaccard_bags = jaccardSim(seqs[i], seqs[j], k, False)
+                sims[(i,j)] = (naive, jaccard_sets, jaccard_bags)
+                if naive > sim_threshold:
+                    truePairs_naive.add((i,j))
+                    f1.write(str(i)+","+str(j)+" "+str(naive)+"\n")
+                if jaccard_sets > sim_threshold:
+                    truePairs_sets.add((i,j))
+                    f2.write(str(i)+","+str(j)+" "+str(jaccard_sets)+"\n")
+                if jaccard_bags > sim_threshold:
+                    truePairs_bags.add((i,j))
+                    f3.write(str(i)+","+str(j)+" "+str(jaccard_bags)+"\n")
+                if doPrint:
+                    print i,j
+                    print seqs[i], seqs[j]
+                    print naive
+                    print jaccard_sets
+                    print jaccard_bags
+                if count % 500000 == 0:
+                    logprint(log, False, "Processed", format(count, ',d'),
+                             "pairs in", (time.clock() - tim) / 60, "minutes")
+                    logprint(log, True, "Memory usage (in mb):",
+                             memory_usage_resource())
+    processing_time = (time.clock() - tim) / 60
+    c = "{:,}".format(count).replace(",", ".")
+    logprint(log, False, "Processed", c, "pairs in", processing_time,
+             "minutes")
+    logprint(log, False, "Memory usage (in mb):", memory_usage_resource())
+    logprint(log, False, "Difference jaccard sets vs naive\n",
+             truePairs_sets.difference(truePairs_naive))
+    logprint(log, False, "Difference niave vs jaccard sets\n",
+             truePairs_naive.difference(truePairs_sets))
+    logprint(log, False, "Number of all pairs:", count)
+    
+    # Compute similarites for lsh pairs
+    totalPairs = 0
+    truePairs_lsh_naive = set()
+    truePairs_lsh_sets = set()
+    truePairs_lsh_bags = set()
+    for i in candidatePairs:
+        for j in candidatePairs[i]:
+            if i % 2 == 0:
+                totalPairs += 1
+                if sims[(i,j)][0] > sim_threshold:
+                    truePairs_lsh_naive.add((i,j))
+                    f4.write(str(i)+","+str(j)+" "+str(sims[(i,j)][0])+"\n")
+                if sims[(i,j)][1] > sim_threshold:
+                    truePairs_lsh_sets.add((i,j))
+                    f5.write(str(i)+","+str(j)+" "+str(sims[(i,j)][1])+"\n")
+                if sims[(i,j)][2] > sim_threshold:
+                    truePairs_lsh_bags.add((i,j))
+                    f6.write(str(i)+","+str(j)+" "+str(sims[(i,j)][2])+"\n")
+    logprint(log, False, "Naive pairs not found by LSH\n",
+             truePairs_naive.difference(truePairs_lsh_naive))
+    logprint(log, False, "Jaccard set pairs not found by LSH\n",
+             truePairs_sets.difference(truePairs_lsh_sets))
+    logprint(log, False, "Jaccard set pairs not found by LSH\n",
+             truePairs_bags.difference(truePairs_lsh_bags))
+    logprint(log, False, "Number of lsh pairs:", totalPairs) 
+
+
 def findSimilarPairs(reads, candidatePairs, k, b, r, m, log):
     """
     Find candidate pairs that has a similarity above the threshold t
@@ -1062,23 +1177,24 @@ def findSimilarPairs(reads, candidatePairs, k, b, r, m, log):
     logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
 
 
-def globalAlignment(doc1, doc2, extraInfo=False):
+def globalAlignment(dna1, dna2, extraInfo=False):
     """
     Aligning sequences by using a sliding window approach.
     Returns the best score (matches / seqlength) between the two sequences.
+    doc1 is a leftpart and doc2 is a rightpart
     """
     start = 0
     if extraInfo:
         bestScore = (0, 0, 0)
     else:
         bestScore = 0
-    seqLength = len(doc1.dna)-start
-    while seqLength > 24:
+    seqLength = len(dna1)-start
+    while seqLength > 12:
         # print seqLength, bestScore[1]
         matches = 0
         for i in xrange(seqLength):
             # print len(doc1.dna)-start
-            if doc1.dna[i] == doc2.dna[i+start]:
+            if dna1[i] == dna2[i+start]:
                 matches += 1
         # print bestScore
         score = matches / float(seqLength)
@@ -1095,27 +1211,17 @@ def globalAlignment(doc1, doc2, extraInfo=False):
                 if bestScore == 1.0:
                     return bestScore
         start += 1
-        seqLength = len(doc1.dna)-start
+        seqLength = len(dna1)-start
     return bestScore
 
 
-def jaccardSim(doc1, doc2, k, sim_measure="standard"):
+def jaccardSim(doc1, doc2, k, jaccard_sets=True):
     """
     Computing the jaccard similarity.
     Option to use jaccard bag similarity or standard jaccard similarity.
     """
-    # ## Bag jaccard sim ## #
-    if sim_measure == "bag":
-        counterA = doc1.counterShingles
-        counterB = doc2.counterShingles
-        intersection = sum((counterA & counterB).values())
-        if intersection == 0:
-            return 0
-        union = len(doc1.dna) + len(doc2.dna) - intersection
-        return float(intersection) / union
-
     # ## standard jaccard sim ## #
-    if sim_measure == "standard":
+    if jaccard_sets:
         shingles1 = getDocShingles(doc1, k)
         shingles2 = getDocShingles(doc2, k)
         intersection = shingles1.intersection(shingles2)
@@ -1123,9 +1229,24 @@ def jaccardSim(doc1, doc2, k, sim_measure="standard"):
             return 0
         union = shingles1.union(shingles2)
         return float(len(intersection)) / len(union)
+    
+    # ## Bag jaccard sim ## #
+    else:
+        shingles1 = getDocShingles(doc1, k, False)
+        shingles2 = getDocShingles(doc2, k, False)
+        counterA = Counter(shingles1)
+        counterB = Counter(shingles2)
+        intersection = sum((counterA & counterB).values())
+        if intersection == 0:
+            return 0
+        # Definition 1
+        #union = len(shingles1) + len(shingles2)# - intersection
+        # Definition 2
+        union = sum((counterA | counterB).values())
+        return float(intersection) / union
 
 
-def validateJaccardSim(reads, candidatePairs, k, b, r, alg, log):
+def makeSPlot(reads, candidatePairs, k, b, r, alg, log):
     """
     Method for used for obtaining information about the validity of the pairs
     found by LSH
@@ -1591,7 +1712,7 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
                 logprint(log, True, "num useful groups:", numUsefulGroups)
                 #c2 = 0
                 #sys.exit()
-                gc.collect()
+                #gc.collect()
 
     logprint(log, False, "Finished sequence alignment",
              (time.clock() - tim) / 60, "minutes")
@@ -2534,6 +2655,9 @@ def main():
                      str(rows)+"_m_"+str(minhash_alg)
             exportCandidatePairs(candidatePairs, output_file, log)
 
+        pairsFoundByLSH(normal_file, diseased_file, candidatePairs, k, bands,
+                        rows, log)
+        
         sys.exit()
 
         sequenceAlignment(candidatePairs, normal_file, diseased_file, log)
