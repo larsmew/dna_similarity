@@ -450,6 +450,12 @@ def computeShinglesTable(fasta_file, shinglesPos, k, log):
                         if shingle not in shinglesPos:
                             shinglesPos[shingle] = pos
                             pos += 1
+                    if len(leftpart) < k:
+                        logprint(log, False, 
+                                 "ERROR: k larger than part length\n",
+                                 "      Pick k smaller than", len(leftpart)
+                        )
+                        sys.exit()
                     read = ""
             # Concatenate multi-line sequences into one string
             else:
@@ -623,7 +629,7 @@ def getPrime(offset):
 #                         Locality Sensitive Hashing                         #
 #                                                                            #
 # ************************************************************************** #
-def runLSH(normal, diseased, bands, rows, n, k, seed, minhash_alg, log):
+def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, log):
     """
     Minhash algorithms:
         pre-computed hash functions:
@@ -656,9 +662,9 @@ def runLSH(normal, diseased, bands, rows, n, k, seed, minhash_alg, log):
             shingles = computeShinglesSet(diseased, shingles, k, log)
         # Use Locality-Sensitive Hashing to compute for each bands the buckets
         # with similar documents (reads) obtained by minhashing each read.
-        #buckets = dict()
+        buckets = dict()
         for b in xrange(bands):
-            buckets = dict()
+            #buckets = dict()
             #candidatePairs = dict()
             # minhashing(fasta_file, shingles, buckets, k, rows,
             #            minhash_alg, b, bands, log)
@@ -669,8 +675,9 @@ def runLSH(normal, diseased, bands, rows, n, k, seed, minhash_alg, log):
             #          total_size(buckets) / 1024, "KB")
             # logprint(log, False, "Size of candidatePairs",
             #          total_size(candidatePairs)/1024, "KB")
-            #buckets = dict()
-            #gc.collect()
+            
+            buckets.clear()            
+            
             # for idx in candidatePairs:
             #     try:
             #         data = candDisk[idx]
@@ -694,6 +701,7 @@ def runLSH(normal, diseased, bands, rows, n, k, seed, minhash_alg, log):
         logprint(log, True, "Memory usage (in mb):", memory_usage_resource(),
                  "\n")
         # print "Size of candidatePairs", total_size(candidatePairs)/1024, "KB"
+        return (time.clock() - tim) / 60, memory_usage_resource()
 
         return candidatePairs
 
@@ -1665,11 +1673,12 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
     numParts = len(candidatePairs) / 2
     prog = 0
     tim = time.clock()
+    alignedGroups = []
     for read_R in candidatePairs:
-        if read_R % 2 == 1:
+        if read_R % 2 == 1 and read_R < secondSample:
         # if read_R == 42535:
         # if read_R == 19:
-            alignedGroups = []
+            alignedGroups.clear()
 
             # Align left parts
             alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log)
@@ -2649,16 +2658,15 @@ def main():
             # candidatePairs = runLSH(fasta_file, bands, rows, n, k, seed,
             #                         minhash_alg, log)
             candidatePairs = runLSH(normal_file, diseased_file, bands, rows,
-                                    n, k, seed, minhash_alg, log)
+                                    k, seed, minhash_alg, log)
         if output_file:
             output = "candidate_pairs_k_"+str(k)+"_b_"+str(bands)+"_r_"+ \
                      str(rows)+"_m_"+str(minhash_alg)
             exportCandidatePairs(candidatePairs, output_file, log)
 
+        sys.exit()
         pairsFoundByLSH(normal_file, diseased_file, candidatePairs, k, bands,
                         rows, log)
-        
-        sys.exit()
 
         sequenceAlignment(candidatePairs, normal_file, diseased_file, log)
         #seqAlignAllReads(fasta_file, log)

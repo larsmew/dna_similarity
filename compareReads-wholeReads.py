@@ -665,11 +665,12 @@ def runLSH(normal, diseased, bands, rows, n, k, seed, minhash_alg, log):
             shingles = computeShinglesSet(diseased, shingles, k, log)
         # Use Locality-Sensitive Hashing to compute for each bands the buckets
         # with similar documents (reads) obtained by minhashing each read.
+        buckets = dict()
         for b in xrange(bands):
-            buckets = dict()
             minhashing(normal, diseased, shingles, buckets, k, rows,
                        minhash_alg, b, bands, log)
             lshBand(buckets, b, candidatePairs, log)
+            buckets.clear()
 
         logprint(log, False, "\nNumber of unique candidate pairs",
                  sum(len(candidatePairs[i]) for i in candidatePairs)/2)
