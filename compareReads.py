@@ -701,7 +701,7 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, log):
         logprint(log, True, "Memory usage (in mb):", memory_usage_resource(),
                  "\n")
         # print "Size of candidatePairs", total_size(candidatePairs)/1024, "KB"
-        return (time.clock() - tim) / 60, memory_usage_resource()
+        #return (time.clock() - tim) / 60, memory_usage_resource()
 
         return candidatePairs
 
@@ -1017,6 +1017,58 @@ def minhashing_alg6(dna, idx, shingles, buckets, k, rows, p, a, b):
         buckets[key].append(idx)
     else:
         buckets[key] = [idx]
+
+
+# ************************************************************************** #
+#                                                                            #
+#                               BuhLSH Testing                               #
+#                                                                            #
+# ************************************************************************** #
+def buhLSH(normal, diseased, bands, k, seed, log):
+    """
+    FAR FROM FUNCTIONAL
+    """
+    tim = time.clock()
+    random.seed(seed)
+    candidatePairs = dict()
+    
+    mis = 1 # r
+    picks = 30 # k
+    idx = 0
+    length = 37
+    
+    buckets = dict()
+    for b in xrange(bands):
+        lshValue = [random.randrange(k) for i in xrange(picks)]
+        for part in getPartsFromFile(normal, log):
+            # kmers = getDocShingles(part, k)
+            # for kmer in kmers:
+            #     value = [kmer[i] for i in lshValue]
+            #     print value
+            value = [part[i] for i in lshValue]
+            key = ','.join(map(str, value))
+            if key in buckets:
+                buckets[key].append(idx)
+            else:
+                buckets[key] = [idx]
+            idx += 1
+        lshBand(buckets, b, candidatePairs, log)
+        
+        buckets.clear()
+    
+    logprint(log, False, "\nNumber of unique candidate pairs",
+             sum(len(candidatePairs[i]) for i in candidatePairs)/2)
+    logprint(log, False, "Finished LSH in",
+             (time.clock() - tim) / 60, "minutes")
+    logprint(log, True, "Memory usage (in mb):", memory_usage_resource(),
+             "\n")
+    
+    reads = getAllReads(normal, log) + getAllReads(diseased, log)
+    for id1 in candidatePairs:
+        for id2 in candidatePairs[id1]:
+            print id1,id2
+            print jaccardSim(reads[id1], reads[id2], k)
+                    
 
 
 # ************************************************************************** #
@@ -2664,9 +2716,9 @@ def main():
                      str(rows)+"_m_"+str(minhash_alg)
             exportCandidatePairs(candidatePairs, output_file, log)
 
-        sys.exit()
-        pairsFoundByLSH(normal_file, diseased_file, candidatePairs, k, bands,
-                        rows, log)
+        # sys.exit()
+        # pairsFoundByLSH(normal_file, diseased_file, candidatePairs, k, bands,
+        #                 rows, log)
 
         sequenceAlignment(candidatePairs, normal_file, diseased_file, log)
         #seqAlignAllReads(fasta_file, log)
