@@ -1394,7 +1394,8 @@ def makeSPlot(fasta_file, candidatePairs, k, b, r, alg, log):
              "_m"+str(alg)+"_readsfa.txt", 'w')
     for i in xrange(len(allPairs)):
         if allPairs[i] == 0:
-            f.write(str(0)+" "+str(0)+" "+str(0)+str(possibleSims[i])+"\n")
+            f.write(str(0)+" "+str(0)+" "+str(0)+
+                    " "+str(possibleSims[i])+"\n")
         else:
             f.write(str(lshPairs[i])+" "+str(allPairs[i])+" "+
                 str(float(lshPairs[i]) / allPairs[i])+" "+
