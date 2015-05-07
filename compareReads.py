@@ -1136,21 +1136,26 @@ def pairsFoundByLSH(normal, diseased, candidatePairs, k, b, r, log):
                 if naive > sim_threshold:
                     truePairs_naive.add((i,j))
                     f1.write(str(i)+","+str(j)+" "+str(naive)+"\n")
-                    if j in candidatePairs[i]:
-                        truePairs_lsh_naive.add((i,j))
-                        f4.write(str(i)+","+str(j)+" "+str(naive)+"\n")
+                    if i in candidatePairs:
+                        if j in candidatePairs[i]:
+                            truePairs_lsh_naive.add((i,j))
+                            f4.write(str(i)+","+str(j)+" "+str(naive)+"\n")
                 if jaccard_sets > sim_threshold:
                     truePairs_sets.add((i,j))
                     f2.write(str(i)+","+str(j)+" "+str(jaccard_sets)+"\n")
-                    if j in candidatePairs[i]:
-                        truePairs_lsh_sets.add((i,j))
-                        f5.write(str(i)+","+str(j)+" "+str(jaccard_sets)+"\n")
+                    if i in candidatePairs:
+                        if j in candidatePairs[i]:
+                            truePairs_lsh_sets.add((i,j))
+                            f5.write(str(i)+","+str(j)+" "+
+                                     str(jaccard_sets)+"\n")
                 if jaccard_bags > sim_threshold:
                     truePairs_bags.add((i,j))
                     f3.write(str(i)+","+str(j)+" "+str(jaccard_bags)+"\n")
-                    if j in candidatePairs[i]:
-                        truePairs_lsh_bags.add((i,j))
-                        f6.write(str(i)+","+str(j)+" "+str(jaccard_bags)+"\n")
+                    if i in candidatePairs:
+                        if j in candidatePairs[i]:
+                            truePairs_lsh_bags.add((i,j))
+                            f6.write(str(i)+","+str(j)+" "+
+                                     str(jaccard_bags)+"\n")
                 if doPrint:
                     print i,j
                     print seqs[i], seqs[j]
