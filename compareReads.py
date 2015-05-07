@@ -1095,18 +1095,19 @@ def pairsFoundByLSH(normal, diseased, candidatePairs, k, b, r, log):
     seqsDiseased = getAllReads(diseased, log)
     seqs = seqsNormal + seqsDiseased
 
+    filename = "alligator_20K_memImpro"
     path = "lshPairsVsAllPairs/"
-    f1 = open(path+"naive_pairs_all_alligator_20K_b_"+str(b)+"_r_"+
+    f1 = open(path+"naive_pairs_all_"+filename+"_b_"+str(b)+"_r_"+
               str(r)+"_k_"+str(k)+".txt", 'w')
-    f2 = open(path+"jaccard_sets_pairs_all_alligator_20K_b_"+str(b)+"_r_"+
+    f2 = open(path+"jaccard_sets_pairs_all_"+filename+"_b_"+str(b)+"_r_"+
               str(r)+"_k_"+str(k)+".txt", 'w')
-    f3 = open(path+"jaccard_bags_pairs_all_alligator_20K_b_"+str(b)+"_r_"+
+    f3 = open(path+"jaccard_bags_pairs_all_"+filename+"_b_"+str(b)+"_r_"+
               str(r)+"_k_"+str(k)+".txt", 'w')
-    f4 = open(path+"naive_pairs_lsh_alligator_20K_b_"+str(b)+"_r_"+
+    f4 = open(path+"naive_pairs_lsh_"+filename+"_b_"+str(b)+"_r_"+
               str(r)+"_k_"+str(k)+".txt", 'w')
-    f5 = open(path+"jaccard_sets_pairs_lsh_alligator_20K_b_"+str(b)+"_r_"+
+    f5 = open(path+"jaccard_sets_pairs_lsh_"+filename+"_b_"+str(b)+"_r_"+
               str(r)+"_k_"+str(k)+".txt", 'w')
-    f6 = open(path+"jaccard_bags_pairs_lsh_alligator_20K_b_"+str(b)+"_r_"+
+    f6 = open(path+"jaccard_bags_pairs_lsh_"+filename+"_b_"+str(b)+"_r_"+
               str(r)+"_k_"+str(k)+".txt", 'w')
     
 
