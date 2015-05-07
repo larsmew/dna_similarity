@@ -1306,7 +1306,7 @@ def jaccardSim(doc1, doc2, k, jaccard_sets=True):
         return float(intersection) / union
 
 
-def makeSPlot(reads, candidatePairs, k, b, r, alg, log):
+def makeSPlot(fasta_file, candidatePairs, k, b, r, alg, log):
     """
     Method for used for obtaining information about the validity of the pairs
     found by LSH
@@ -1319,6 +1319,8 @@ def makeSPlot(reads, candidatePairs, k, b, r, alg, log):
     # f3 = open("candidate_pairs_b"+str(b)+"_r"+str(r)+"_k"+str(k)+
     #           "_m"+str(alg)+"_rest.txt", 'w')
 
+    reads = getAllReads(fasta_file, log)
+    
     # Create a mapper to look up position in array given a similarity
     n1 = len(reads[0])
     n2 = len(reads[1])
@@ -1343,48 +1345,53 @@ def makeSPlot(reads, candidatePairs, k, b, r, alg, log):
     count = 0
     count2 = 0
     process = 0
-    for doc1 in xrange(numReads):
-        start = 1
-        if doc1 % 2 == 0:
-            start = 3
-        for doc2 in xrange(doc1+start, numReads, 2):
-            dna1 = reads[doc1]
-            dna2 = reads[doc2]
-            jaccard = jaccardSim(dna1, dna2, k)
+    # for doc1 in xrange(numReads):
+    #     start = 1
+    #     if doc1 % 2 == 0:
+    #         start = 3
+    #     for doc2 in xrange(doc1+start, numReads, 2):
+    for doc1 in xrange(0, numReads, 2):
+        for doc2 in xrange(1, numReads, 2):
+            if i+1 != j:
+                dna1 = reads[doc1]
+                dna2 = reads[doc2]
+                jaccard = jaccardSim(dna1, dna2, k)
 
-            ### Saves the similarity for each pair, and for pairs found by LSH
-            # if jaccard > 0:
-            #     f1.write(str(pairNum) + " " + str(jaccard) + "\n")
-            #     rest = True
-            #     if doc1 in candidatePairs:
-            #         if doc2 in candidatePairs[doc1]:
-            #             f2.write(str(pairNum) + " " + str(jaccard) + "\n")
-            #             rest = False
-            #             count += 1
-            #     if rest:
-            #         f3.write(str(pairNum) + " " + str(jaccard) + "\n")
-            #         count2 += 1
-            #     pairNum += 1
+                ### Saves the similarity for each pair, and for pairs found by LSH
+                # if jaccard > 0:
+                #     f1.write(str(pairNum) + " " + str(jaccard) + "\n")
+                #     rest = True
+                #     if doc1 in candidatePairs:
+                #         if doc2 in candidatePairs[doc1]:
+                #             f2.write(str(pairNum) + " " + str(jaccard) + "\n")
+                #             rest = False
+                #             count += 1
+                #     if rest:
+                #         f3.write(str(pairNum) + " " + str(jaccard) + "\n")
+                #         count2 += 1
+                #     pairNum += 1
 
-            if jaccard > 0:
-                pos = posSimilarities[jaccard]
-                if doc1 in candidatePairs:
-                    if doc2 in candidatePairs[doc1]:
-                        lshPairs[pos] += 1
-                        count += 1
-                allPairs[pos] += 1
-                pairNum += 1
-            else:
-                allPairs[0] += 1
+                if jaccard > 0:
+                    pos = posSimilarities[jaccard]
+                    if doc1 in candidatePairs:
+                        if doc2 in candidatePairs[doc1]:
+                            lshPairs[pos] += 1
+                            count += 1
+                    allPairs[pos] += 1
+                    pairNum += 1
+                else:
+                    allPairs[0] += 1
 
 
-            process += 1
-            if process % 500000 == 0:
-                logprint(log, True, "Processed", process, "pairs in time:",
-                      (time.clock() - timer), "Found", pairNum, "cand. pairs")
+                process += 1
+                if process % 500000 == 0:
+                    logprint(log, True, "Processed", process, 
+                             "pairs in time:", (time.clock() - timer),
+                             "Found", pairNum, "cand. pairs")
 
+    p = "s_plot/"
     f = open("s_shape_info_b"+str(b)+"_r"+str(r)+"_k"+str(k)+
-             "_m"+str(alg)+"_small_581steps.txt", 'w')
+             "_m"+str(alg)+"_readsfa.txt", 'w')
     for i in xrange(len(allPairs)):
         if allPairs[i] == 0:
             f.write(str(0)+" "+str(0)+" "+str(0)+str(possibleSims[i])+"\n")
@@ -1725,12 +1732,11 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
     numParts = len(candidatePairs) / 2
     prog = 0
     tim = time.clock()
-    alignedGroups = []
     for read_R in candidatePairs:
-        if read_R % 2 == 1 and read_R < secondSample:
+        if read_R < secondSample and read_R % 2 == 1:
         # if read_R == 42535:
         # if read_R == 19:
-            alignedGroups.clear()
+            alignedGroups = []
 
             # Align left parts
             alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log)
@@ -2716,6 +2722,8 @@ def main():
                      str(rows)+"_m_"+str(minhash_alg)
             exportCandidatePairs(candidatePairs, output_file, log)
 
+        makeSPlot(fasta_file, candidatePairs, k, bands, rows, minhash_alg,
+                  log)
         # sys.exit()
         # pairsFoundByLSH(normal_file, diseased_file, candidatePairs, k, bands,
         #                 rows, log)
