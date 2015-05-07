@@ -2722,7 +2722,7 @@ def main():
                      str(rows)+"_m_"+str(minhash_alg)
             exportCandidatePairs(candidatePairs, output_file, log)
 
-        makeSPlot(fasta_file, candidatePairs, k, bands, rows, minhash_alg,
+        makeSPlot(normal_file, candidatePairs, k, bands, rows, minhash_alg,
                   log)
         # sys.exit()
         # pairsFoundByLSH(normal_file, diseased_file, candidatePairs, k, bands,
