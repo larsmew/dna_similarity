@@ -1390,7 +1390,7 @@ def makeSPlot(fasta_file, candidatePairs, k, b, r, alg, log):
                              "Found", pairNum, "cand. pairs")
 
     p = "s_plot/"
-    f = open("s_shape_info_b"+str(b)+"_r"+str(r)+"_k"+str(k)+
+    f = open(p+"s_shape_info_b"+str(b)+"_r"+str(r)+"_k"+str(k)+
              "_m"+str(alg)+"_readsfa.txt", 'w')
     for i in xrange(len(allPairs)):
         if allPairs[i] == 0:
@@ -2724,7 +2724,7 @@ def main():
 
         makeSPlot(normal_file, candidatePairs, k, bands, rows, minhash_alg,
                   log)
-        # sys.exit()
+        sys.exit()
         # pairsFoundByLSH(normal_file, diseased_file, candidatePairs, k, bands,
         #                 rows, log)
 
