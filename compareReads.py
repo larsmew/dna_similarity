@@ -164,12 +164,20 @@ def optionParse():
                       action="store",
                       dest="s",
                       help="set <VALUE> as seed for hash functions.")
+    
+    parser.add_option("-T", "--test",
+                      metavar="<VALUE>",
+                      type=int,
+                      action="store",
+                      dest="T",
+                      help="perform test <VALUE>.")
 
     (options, args) = parser.parse_args()
 
     return options.fasta_file, options.normal_file, options.diseased_file,\
            options.k, options.threshold, options.bands, options.rows,\
-           options.m, options.s, options.log, options.input, options.output
+           options.m, options.s, options.log, options.input, options.output,\
+           options.T
 
 
 def memory_usage_resource():
@@ -1088,17 +1096,17 @@ def pairsFoundByLSH(normal, diseased, candidatePairs, k, b, r, log):
     seqs = seqsNormal + seqsDiseased
 
     path = "lshPairsVsAllPairs/"
-    f1 = open(path+"naive_pairs_all_readfa_b_"+str(b)+"_r_"+
+    f1 = open(path+"naive_pairs_all_alligator_20K_b_"+str(b)+"_r_"+
               str(r)+"_k_"+str(k)+".txt", 'w')
-    f2 = open(path+"jaccard_sets_pairs_all_readfa_b_"+str(b)+"_r_"+
+    f2 = open(path+"jaccard_sets_pairs_all_alligator_20K_b_"+str(b)+"_r_"+
               str(r)+"_k_"+str(k)+".txt", 'w')
-    f3 = open(path+"jaccard_bags_pairs_all_readfa_b_"+str(b)+"_r_"+
+    f3 = open(path+"jaccard_bags_pairs_all_alligator_20K_b_"+str(b)+"_r_"+
               str(r)+"_k_"+str(k)+".txt", 'w')
-    f4 = open(path+"naive_pairs_lsh_readfa_b_"+str(b)+"_r_"+
+    f4 = open(path+"naive_pairs_lsh_alligator_20K_b_"+str(b)+"_r_"+
               str(r)+"_k_"+str(k)+".txt", 'w')
-    f5 = open(path+"jaccard_sets_pairs_lsh_readfa_b_"+str(b)+"_r_"+
+    f5 = open(path+"jaccard_sets_pairs_lsh_alligator_20K_b_"+str(b)+"_r_"+
               str(r)+"_k_"+str(k)+".txt", 'w')
-    f6 = open(path+"jaccard_bags_pairs_lsh_readfa_b_"+str(b)+"_r_"+
+    f6 = open(path+"jaccard_bags_pairs_lsh_alligator_20K_b_"+str(b)+"_r_"+
               str(r)+"_k_"+str(k)+".txt", 'w')
     
 
@@ -1108,7 +1116,7 @@ def pairsFoundByLSH(normal, diseased, candidatePairs, k, b, r, log):
     truePairs_naive = set()
     truePairs_sets = set()
     truePairs_bags = set()
-    sim_threshold = 0.5
+    sim_threshold = -1
     doPrint = False
     tim = time.clock()
     # Compute similarities for all pairs
@@ -1116,7 +1124,7 @@ def pairsFoundByLSH(normal, diseased, candidatePairs, k, b, r, log):
         for j in xrange(1, len(seqs),2):
             if i+1 != j:
                 count += 1
-                naive = globalAlignment(seqs[i],seqs[j])
+                naive = globalAlignment(seqs[i],seqs[j], 30)
                 jaccard_sets = jaccardSim(seqs[i], seqs[j], k)
                 jaccard_bags = jaccardSim(seqs[i], seqs[j], k, False)
                 sims[(i,j)] = (naive, jaccard_sets, jaccard_bags)
@@ -1147,7 +1155,7 @@ def pairsFoundByLSH(normal, diseased, candidatePairs, k, b, r, log):
     logprint(log, False, "Memory usage (in mb):", memory_usage_resource())
     logprint(log, False, "Difference jaccard sets vs naive\n",
              truePairs_sets.difference(truePairs_naive))
-    logprint(log, False, "Difference niave vs jaccard sets\n",
+    logprint(log, False, "Difference naive vs jaccard sets\n",
              truePairs_naive.difference(truePairs_sets))
     logprint(log, False, "Number of all pairs:", count)
     
@@ -1173,7 +1181,7 @@ def pairsFoundByLSH(normal, diseased, candidatePairs, k, b, r, log):
              truePairs_naive.difference(truePairs_lsh_naive))
     logprint(log, False, "Jaccard set pairs not found by LSH\n",
              truePairs_sets.difference(truePairs_lsh_sets))
-    logprint(log, False, "Jaccard set pairs not found by LSH\n",
+    logprint(log, False, "Jaccard bag pairs not found by LSH\n",
              truePairs_bags.difference(truePairs_lsh_bags))
     logprint(log, False, "Number of lsh pairs:", totalPairs) 
 
@@ -1237,7 +1245,7 @@ def findSimilarPairs(reads, candidatePairs, k, b, r, m, log):
     logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
 
 
-def globalAlignment(dna1, dna2, extraInfo=False):
+def globalAlignment(dna1, dna2, t, extraInfo=False):
     """
     Aligning sequences by using a sliding window approach.
     Returns the best score (matches / seqlength) between the two sequences.
@@ -1249,7 +1257,7 @@ def globalAlignment(dna1, dna2, extraInfo=False):
     else:
         bestScore = 0
     seqLength = len(dna1)-start
-    while seqLength > 12:
+    while seqLength > t:
         # print seqLength, bestScore[1]
         matches = 0
         for i in xrange(seqLength):
@@ -2701,7 +2709,8 @@ def main():
 
     # Parse command line options
     fasta_file, normal_file, diseased_file, k, threshold, bands, rows, \
-         minhash_alg, seed, log_file, input_file, output_file = optionParse()
+         minhash_alg, seed, log_file, input_file, output_file, test \
+         = optionParse()
 
     # For testing only
     # input_file = "candidate_pairs_k_16_b_2_r_5_m_6.txt"
@@ -2723,14 +2732,17 @@ def main():
                      str(rows)+"_m_"+str(minhash_alg)
             exportCandidatePairs(candidatePairs, output_file, log)
 
-        makeSPlot(normal_file, candidatePairs, k, bands, rows, minhash_alg,
-                  log)
-        sys.exit()
-        # pairsFoundByLSH(normal_file, diseased_file, candidatePairs, k, bands,
-        #                 rows, log)
-
-        sequenceAlignment(candidatePairs, normal_file, diseased_file, log)
-        #seqAlignAllReads(fasta_file, log)
+        if test == 0:
+            None
+        elif test == 1:
+            makeSPlot(normal_file, candidatePairs, k, bands, rows,
+                      minhash_alg, log)
+        elif test == 2:
+            pairsFoundByLSH(normal_file, diseased_file, candidatePairs, k,
+                            bands, rows, log)
+        else:
+            # If not test to run on LSH, continue with sequence alignment
+            sequenceAlignment(candidatePairs, normal_file, diseased_file, log)
 
         logprint(log, True, "Total time used:", (time.clock() - totim) / 60,
                  "minutes")
