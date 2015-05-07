@@ -1112,13 +1112,17 @@ def pairsFoundByLSH(normal, diseased, candidatePairs, k, b, r, log):
 
     count = 0
     numPairs = len(seqs) * (len(seqs)-1)
-    sims = dict()
+    #sims = dict()
     truePairs_naive = set()
     truePairs_sets = set()
     truePairs_bags = set()
     sim_threshold = -1
     doPrint = False
     tim = time.clock()
+    
+    truePairs_lsh_naive = set()
+    truePairs_lsh_sets = set()
+    truePairs_lsh_bags = set()
     # Compute similarities for all pairs
     for i in xrange(0,len(seqs),2):
         for j in xrange(1, len(seqs),2):
@@ -1127,16 +1131,25 @@ def pairsFoundByLSH(normal, diseased, candidatePairs, k, b, r, log):
                 naive = globalAlignment(seqs[i],seqs[j], 30)
                 jaccard_sets = jaccardSim(seqs[i], seqs[j], k)
                 jaccard_bags = jaccardSim(seqs[i], seqs[j], k, False)
-                sims[(i,j)] = (naive, jaccard_sets, jaccard_bags)
+                #sims[(i,j)] = (naive, jaccard_sets, jaccard_bags)
                 if naive > sim_threshold:
                     truePairs_naive.add((i,j))
                     f1.write(str(i)+","+str(j)+" "+str(naive)+"\n")
+                    if j in candidatePairs[i]:
+                        truePairs_lsh_naive.add((i,j))
+                        f4.write(str(i)+","+str(j)+" "+str(naive)+"\n")
                 if jaccard_sets > sim_threshold:
                     truePairs_sets.add((i,j))
                     f2.write(str(i)+","+str(j)+" "+str(jaccard_sets)+"\n")
+                    if j in candidatePairs[i]:
+                        truePairs_lsh_sets.add((i,j))
+                        f5.write(str(i)+","+str(j)+" "+str(jaccard_sets)+"\n")
                 if jaccard_bags > sim_threshold:
                     truePairs_bags.add((i,j))
                     f3.write(str(i)+","+str(j)+" "+str(jaccard_bags)+"\n")
+                    if j in candidatePairs[i]:
+                        truePairs_lsh_bags.add((i,j))
+                        f6.write(str(i)+","+str(j)+" "+str(jaccard_bags)+"\n")
                 if doPrint:
                     print i,j
                     print seqs[i], seqs[j]
@@ -1160,30 +1173,30 @@ def pairsFoundByLSH(normal, diseased, candidatePairs, k, b, r, log):
     logprint(log, False, "Number of all pairs:", count)
     
     # Compute similarites for lsh pairs
-    totalPairs = 0
-    truePairs_lsh_naive = set()
-    truePairs_lsh_sets = set()
-    truePairs_lsh_bags = set()
-    for i in candidatePairs:
-        for j in candidatePairs[i]:
-            if i % 2 == 0:
-                totalPairs += 1
-                if sims[(i,j)][0] > sim_threshold:
-                    truePairs_lsh_naive.add((i,j))
-                    f4.write(str(i)+","+str(j)+" "+str(sims[(i,j)][0])+"\n")
-                if sims[(i,j)][1] > sim_threshold:
-                    truePairs_lsh_sets.add((i,j))
-                    f5.write(str(i)+","+str(j)+" "+str(sims[(i,j)][1])+"\n")
-                if sims[(i,j)][2] > sim_threshold:
-                    truePairs_lsh_bags.add((i,j))
-                    f6.write(str(i)+","+str(j)+" "+str(sims[(i,j)][2])+"\n")
+    # totalPairs = 0
+    # truePairs_lsh_naive = set()
+    # truePairs_lsh_sets = set()
+    # truePairs_lsh_bags = set()
+    # for i in candidatePairs:
+    #     for j in candidatePairs[i]:
+    #         if i % 2 == 0:
+    #             totalPairs += 1
+    #             if sims[(i,j)][0] > sim_threshold:
+    #                 truePairs_lsh_naive.add((i,j))
+    #                 f4.write(str(i)+","+str(j)+" "+str(sims[(i,j)][0])+"\n")
+    #             if sims[(i,j)][1] > sim_threshold:
+    #                 truePairs_lsh_sets.add((i,j))
+    #                 f5.write(str(i)+","+str(j)+" "+str(sims[(i,j)][1])+"\n")
+    #             if sims[(i,j)][2] > sim_threshold:
+    #                 truePairs_lsh_bags.add((i,j))
+    #                 f6.write(str(i)+","+str(j)+" "+str(sims[(i,j)][2])+"\n")
     logprint(log, False, "Naive pairs not found by LSH\n",
              truePairs_naive.difference(truePairs_lsh_naive))
     logprint(log, False, "Jaccard set pairs not found by LSH\n",
              truePairs_sets.difference(truePairs_lsh_sets))
     logprint(log, False, "Jaccard bag pairs not found by LSH\n",
              truePairs_bags.difference(truePairs_lsh_bags))
-    logprint(log, False, "Number of lsh pairs:", totalPairs) 
+    # logprint(log, False, "Number of lsh pairs:", totalPairs) 
 
 
 def findSimilarPairs(reads, candidatePairs, k, b, r, m, log):
