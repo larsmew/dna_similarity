@@ -1172,10 +1172,10 @@ def pairsFoundByLSH(normal, diseased, candidatePairs, k, b, r, log):
     logprint(log, False, "Processed", c, "pairs in", processing_time,
              "minutes")
     logprint(log, False, "Memory usage (in mb):", memory_usage_resource())
-    logprint(log, False, "Difference jaccard sets vs naive\n",
-             truePairs_sets.difference(truePairs_naive))
-    logprint(log, False, "Difference naive vs jaccard sets\n",
-             truePairs_naive.difference(truePairs_sets))
+    # logprint(log, False, "Difference jaccard sets vs naive\n",
+    #          truePairs_sets.difference(truePairs_naive))
+    # logprint(log, False, "Difference naive vs jaccard sets\n",
+    #          truePairs_naive.difference(truePairs_sets))
     logprint(log, False, "Number of all pairs:", count)
     
     # Compute similarites for lsh pairs
@@ -2594,6 +2594,13 @@ def findMutation(read_R, seqs, leftparts, rightparts, mismatches, first, log):
 
 # ************************************************************************** #
 #                                                                            #
+#                Constructing groups for variations discovery                #
+#                                                                            #
+# ************************************************************************** #
+
+
+# ************************************************************************** #
+#                                                                            #
 #                          Sequence Align All Reads                          #
 #                                                                            #
 # ************************************************************************** #
@@ -2760,7 +2767,7 @@ def main():
             pairsFoundByLSH(normal_file, diseased_file, candidatePairs, k,
                             bands, rows, log)
         else:
-            # If not test to run on LSH, continue with sequence alignment
+            # If no test to run on LSH, continue with contructing 
             sequenceAlignment(candidatePairs, normal_file, diseased_file, log)
 
         logprint(log, True, "Total time used:", (time.clock() - totim) / 60,
