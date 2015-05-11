@@ -712,7 +712,7 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log):
         #return (time.clock() - tim) / 60, memory_usage_resource()
 
         # If testing different k-values
-        if test = 0:
+        if test == 0:
             return (time.clock() - tim) / 60, memory_usage_resource()
 
         return candidatePairs
