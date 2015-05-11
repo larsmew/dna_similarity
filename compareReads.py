@@ -637,7 +637,7 @@ def getPrime(offset):
 #                         Locality Sensitive Hashing                         #
 #                                                                            #
 # ************************************************************************** #
-def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, log):
+def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log):
     """
     Minhash algorithms:
         pre-computed hash functions:
@@ -710,6 +710,10 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, log):
                  "\n")
         # print "Size of candidatePairs", total_size(candidatePairs)/1024, "KB"
         #return (time.clock() - tim) / 60, memory_usage_resource()
+
+        # If testing different k-values
+        if test = 0:
+            return (time.clock() - tim) / 60, memory_usage_resource()
 
         return candidatePairs
 
@@ -2752,18 +2756,30 @@ def main():
             # candidatePairs = runLSH(fasta_file, bands, rows, n, k, seed,
             #                         minhash_alg, log)
             candidatePairs = runLSH(normal_file, diseased_file, bands, rows,
-                                    k, seed, minhash_alg, log)
+                                    k, seed, minhash_alg, test, log)
         if output_file:
             output = "candidate_pairs_k_"+str(k)+"_b_"+str(bands)+"_r_"+ \
                      str(rows)+"_m_"+str(minhash_alg)
             exportCandidatePairs(candidatePairs, output_file, log)
 
         if test == 0:
-            None
+            """
+            Test different k values
+            """
+            logprint(log, True, "Total time used:", 
+                     (time.clock() - totim) / 60, "minutes")
+            sys.exit(str(k)+"\t"+str(candidatePairs[0])+"\t"+
+                     str(candidatePairs[1]))
         elif test == 1:
+            """
+            Test S-curve distribution
+            """
             makeSPlot(normal_file, candidatePairs, k, bands, rows,
                       minhash_alg, log)
         elif test == 2:
+            """
+            Test which pairs are found by LSH
+            """
             pairsFoundByLSH(normal_file, diseased_file, candidatePairs, k,
                             bands, rows, log)
         else:
