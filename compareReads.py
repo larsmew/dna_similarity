@@ -10,8 +10,7 @@ from operator import itemgetter
 from collections import Counter, deque
 from itertools import chain
 #from histogramCandPairs import histogram
-import sys
-import time
+import sys, time
 import random
 import gc
 import copy
@@ -2766,10 +2765,10 @@ def main():
             """
             Test different k values
             """
-            logprint(log, True, "Total time used:", 
-                     (time.clock() - totim) / 60, "minutes")
-            sys.exit(str(k)+"\t"+str(candidatePairs[0])+"\t"+
-                     str(candidatePairs[1]))
+            if fasta_file:
+                import os
+                os.system("echo '"+str(k)+"\t"+str(candidatePairs[0])+"\t"+
+                          str(candidatePairs[1])+"' >> "+fasta_file)
         elif test == 1:
             """
             Test S-curve distribution
