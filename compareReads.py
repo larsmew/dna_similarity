@@ -1806,7 +1806,8 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
                 #c1 = 0
                 global c2
                 logprint(log, True, "right parts aligned:", c2)
-                logprint(log, True, "num useful groups:", numUsefulGroups)
+                logprint(log, True, "num useful groups:", numMutations1)
+                logprint(log, True, "num useful groups:", numMutations2)
                 global c3
                 logprint(log, False, "positions compared:", c3)
                 #c2 = 0
