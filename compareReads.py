@@ -7,9 +7,8 @@ __version__ = "$Revision: 2.0"
 
 from optparse import OptionParser
 from operator import itemgetter
-from collections import Counter, deque
+#from collections import Counter, deque
 from itertools import chain
-#from histogramCandPairs import histogram
 import sys, time
 import random
 import gc
@@ -28,6 +27,7 @@ printMinhashProcess = 500000
 secondSample = 0
 overlap = 9 # Overlap region in both directions i.e. 20 overlap in total
 maxAlignments = 2 # per read
+requiredOverlaps = 3
 
 
 # Sequence Alignment
@@ -1590,15 +1590,20 @@ def print_fullConsensus(preconsensus, consensus, log=None):
     alphabetSize = 4
     for i in xrange(alphabetSize):
         consensusString = ""
+        # Get pre-consensus
         for j in xrange(len(preconsensus)):
-            if i < len(preconsensus[j]):
+            if i < len(preconsensus[j]) and \
+                    preconsensus[j][preconsensus[j].keys()[i]] >= \
+                    requiredOverlaps:
                 consensusString += preconsensus[j].keys()[i]
             else:
                 consensusString += " "
         if consensusString != "":
             consensusString += " "
+        # Get main consensus
         for j in xrange(len(consensus)):
-            if i < len(consensus[j]):
+            if i < len(consensus[j]) and \
+                    consensus[j][consensus[j].keys()[i]] >= requiredOverlaps:
                 consensusString += consensus[j].keys()[i]
             else:
                 consensusString += " "
@@ -1767,7 +1772,8 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
     seqsDiseased = getAllReads(diseased, log)
     seqs = seqsNormal + seqsDiseased
 
-    numUsefulGroups = 0
+    numMutations1 = 0
+    numMutations2 = 0
     numParts = len(candidatePairs) / 4 + 2
     prog = 0
     tim = time.clock()
@@ -1784,22 +1790,8 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
             alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log)
 
             # Analyze the aligned group to find mutations
-            # print_alignedGroups(alignedGroups, read_R, seqs, log)
-            for group in alignedGroups:
-                for rightPartGroup in group.rightPartGroups:
-                    if len(rightPartGroup.mismatches) > 0:
-                        mutation1 = findMutation(read_R, seqs,
-                                group.leftPartsN, rightPartGroup.rightPartsN,
-                                rightPartGroup.mismatches, True, log)
-                        if mutation1 == "Fail":
-                            continue
-                        mutation2 = findMutation(read_R, seqs,
-                                group.leftPartsD, rightPartGroup.rightPartsD,
-                                rightPartGroup.mismatches, False, log)
-                        if mutation2 != "Fail" and mutation1 != mutation2:
-                            numUsefulGroups += 1
-                            print_alignedGroup(group, rightPartGroup, read_R,
-                                                seqs, log)
+            #numMutations1 += oldFindMutation(read_R, seqs, alignedGroups,log)
+            numMutations2 += newFindMutation(read_R, seqs, alignedGroups,log)
 
             # print_alignedGroups(alignedGroups, read_R, seqs, log)
             # sys.exit()
@@ -1832,7 +1824,8 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
     logprint(log, False, "Too small groups:", c8)
     logprint(log, False, "numReadL:", numreadL)
     logprint(log, False, "numReadR:", numreadR)
-    logprint(log, False, "numUsefulGroups:", numUsefulGroups)
+    logprint(log, False, "numMutations1:", numMutations1)
+    logprint(log, False, "numMutations2:", numMutations2)
 
 
 def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log):
@@ -1842,7 +1835,7 @@ def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log):
             m = 0
         else:
             m = M2
-        for alignInfo in findAlignment(seqs[read_R], seqs[read_L],
+        for alignInfo in findAlignment(read_R, read_L, seqs,
                                          readROffset, m, log):
             #offset += len(seqs[read_R-1])
             offset, mis, lenCompared = alignInfo
@@ -1892,20 +1885,27 @@ def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log):
                     group.consensus.append({bp:1})
 
                 # Add overlapping part of read_L to consensus
+                seq_read_L = ''.join((seqs[read_L], seqs[read_L+1]))
                 for index in xrange(start):
                     i = index + group.readROffset + offset
-                    bp = seqs[read_L][index]
+                    bp = seq_read_L[index]
                     group.consensus[i][bp] = group.consensus[i].get(bp, 0) + 1
 
+                # print " "*offset, (seqs[read_L]+seqs[read_L+1])
+                # print " "*-offset, seqs[read_R]
+                # print offset
+
                 # Add the rest of read_L to consensus
-                for bp in ''.join((seqs[read_L][start:], seqs[read_L+1])):
+                for bp in seq_read_L[start:]:
                     group.consensus.append({bp:1})
 
                 # Append new group to the other groups
                 alignedGroups.append(group)
 
 
-def findAlignment(read_R, read_L, readROffset, m1, log):
+def findAlignment(r_R, r_L, seqs, readROffset, m, log):
+    read_R = seqs[r_R]
+    read_L = seqs[r_L]
     doPrint = False
     offset = 0
     alignments = 0
@@ -1915,6 +1915,8 @@ def findAlignment(read_R, read_L, readROffset, m1, log):
     else:
         lengthToCompare = len(read_R)# - overlap*2
     overlapLength = lengthToCompare - overlap*2
+    lengthToCompare2 = lengthToCompare
+    # check for alignment by shifting read_L along read_R
     while lengthToCompare > overlapLength:
         mismatches = set()
         # if log == 2119:
@@ -1925,16 +1927,13 @@ def findAlignment(read_R, read_L, readROffset, m1, log):
                 global c3
                 c3 += 1
                 mismatches.add(i+offset+readROffset)
-                if len(mismatches) > m1:
+                if len(mismatches) > m:
                     break
-        if len(mismatches) <= m1:
+        if len(mismatches) <= m:
             if doPrint:
                 print "offset:", offset
-                print read_R
-                if offset == 0:
-                    print read_L
-                else:
-                    print " "*(offset-1), read_L
+                print "", read_R
+                print " "*(offset-1), read_L
                 print mismatches
             yield offset, mismatches, lengthToCompare
             alignments += 1
@@ -1943,6 +1942,40 @@ def findAlignment(read_R, read_L, readROffset, m1, log):
         offset += 1
         lengthToCompare -= 1
     #yield -1
+    
+    # check for alignment by shifting read_R along read_L
+    # offset = 0
+    # read_L_rest = seqs[r_L+1]
+    # while lengthToCompare2 > overlapLength:
+    #     mismatches = set()
+    #     for i in xrange(lengthToCompare2):
+    #         if read_R[i] != read_L[i+offset]:
+    #             global c3
+    #             c3 += 1
+    #             mismatches.add(i+offset+readROffset)
+    #             if len(mismatches) > m:
+    #                 break
+    #     # Check overshiftet part of read_R against last part of read_L
+    #     if len(mismatches) <= m:
+    #         restToCompare = len(read_R)-len(read_L)+offset
+    #         start = len(read_R) - restToCompare
+    #         for i in xrange(restToCompare):
+    #             if read_R[i+start] != read_L_rest[i]:
+    #                 mismatches.add(i+offset+readROffset)
+    #                 if len(mismatches) > m:
+    #                     break
+    #     if len(mismatches) <= m:
+    #         if doPrint:
+    #             print "offset:", offset
+    #             print " "*(offset), read_R
+    #             print " "*(-offset), read_L+" "+read_L_rest
+    #             print mismatches
+    #         yield -offset, mismatches, lengthToCompare2+2*offset
+    #         alignments += 1
+    #         if maxAlignments == alignments:
+    #             break
+    #     offset += 1
+    #     lengthToCompare2 -= 1
 
 
 def fitsInGroup(group, seqs, read_R, read_L, alignInfo, offset, m2):
@@ -1953,6 +1986,13 @@ def fitsInGroup(group, seqs, read_R, read_L, alignInfo, offset, m2):
     mismatches = 0
     offset += group.readROffset
     offset2, mis, lenCompared = alignInfo
+    
+    # yo = False
+    # if offset < 50:
+    #     yo = True
+    #     print " "*offset, (seqs[read_L]+seqs[read_L+1])
+    #     print " "*-offset, seqs[read_R-1]+seqs[read_R]
+    #     print offset
 
     if old:
         # Check consensus for mismatches before alignment of read_L
@@ -1987,8 +2027,12 @@ def fitsInGroup(group, seqs, read_R, read_L, alignInfo, offset, m2):
 
         lenToCompare = len(group.consensus)-len(seq_read_R)
         readLLength = len(lread_L) - lenCompared
-        # print lenCompared
-        # print readLLength
+        # if offset < 50:
+        #     print
+        #     print_fullConsensus([], group.consensus)
+        #     print lenToCompare
+        #     print readLLength
+        #     print lenCompared
         if readLLength < lenToCompare:
             extraStart = lenToCompare - readLLength
             lenToCompare = readLLength
@@ -2007,9 +2051,16 @@ def fitsInGroup(group, seqs, read_R, read_L, alignInfo, offset, m2):
         for m in mis:
             mismatches.add(m)
 
+        # if offset < 50:
+        #     print " "*offset, (seqs[read_L]+seqs[read_L+1])
+        #     print " "*-offset, seqs[read_R-1]+seqs[read_R]
+        #     print offset
+
         if len(mismatches) <= m2:
             group.mismatches = mismatches
         else:
+            # if yo:
+            #     sys.exit()
             return False
 
     # Update consensus
@@ -2022,6 +2073,11 @@ def fitsInGroup(group, seqs, read_R, read_L, alignInfo, offset, m2):
     extraPart = len(lread_L) - len(group.consensus) + offset
     for i in xrange(extraPart):
         group.consensus.append({lread_L[-(extraPart-i)]:1})
+
+    # if offset < 50:
+    #     print " "*offset, (seqs[read_L]+seqs[read_L+1])
+    #     print " "*-offset, seqs[read_R-1]+seqs[read_R]
+    #     print offset
 
     if group.leftReadsOffset > offset:
         group.leftReadsOffset = offset
@@ -2498,7 +2554,7 @@ def testRead(group, seqs, read_R, next_read_R, offset, m2, alignments, log):
 def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
     startOnePosOverlap = True
     for group in alignedGroups:
-        if len(group.leftPartsN) < 3:
+        if len(group.leftPartsN) < 2:
             # logprint(log, False, "\n\nTOO SMALL GROUP:")
             # print_leftGroup(group, read_R, seqs, log)
             global c8
@@ -2542,8 +2598,8 @@ def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
                             if alignments == maxAlignments:
                                 break
                     else:
-                        for alignInfo in findAlignment(seqs[next_read_R],
-                                    seqs[read_L], group.readROffset, 0, log):
+                        for alignInfo in findAlignment(next_read_R, read_L,
+                                    seqs, group.readROffset, 0, log):
                             for offset2 in (group.leftPartsN[read_L] +
                                             group.leftPartsD[read_L]):
                                 # global numreadR
@@ -2585,6 +2641,50 @@ def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
 #          TCAGAA TGCCC
 #         TTCAGAA TGCC
 # 7 6 3 = 4
+def newFindMutation(read_R, seqs, alignedGroups, log):
+    numUsefulGroups = 0
+    for group in alignedGroups:
+        for rightPartGroup in group.rightPartGroups:
+            for pos in rightPartGroup.mismatches:
+                validBPs = 0
+                if pos < 0:
+                    for overlaps in rightPartGroup.preConsensus[pos].values():
+                        if overlaps >= requiredOverlaps:
+                            validBPs += 1
+                else:
+                    # if len(rightPartGroup.consensus[pos]) > 2:
+                    #     print_alignedGroup(group, rightPartGroup, read_R,
+                    #                         seqs, log)
+                    for overlaps in rightPartGroup.consensus[pos].values():
+                        if overlaps >= requiredOverlaps:
+                            validBPs += 1
+                if validBPs > 1:
+                    print_alignedGroup(group, rightPartGroup, read_R,
+                                        seqs, log)
+                    numUsefulGroups += 1
+    return numUsefulGroups
+
+
+def oldFindMutation(read_R, seqs, alignedGroups, log):
+    numUsefulGroups = 0
+    for group in alignedGroups:
+        for rightPartGroup in group.rightPartGroups:
+            if len(rightPartGroup.mismatches) > 0:
+                mutation1 = findMutation(read_R, seqs,
+                        group.leftPartsN, rightPartGroup.rightPartsN,
+                        rightPartGroup.mismatches, True, log)
+                if mutation1 == "Fail":
+                    continue
+                mutation2 = findMutation(read_R, seqs,
+                        group.leftPartsD, rightPartGroup.rightPartsD,
+                        rightPartGroup.mismatches, False, log)
+                if mutation2 != "Fail" and mutation1 != mutation2:
+                    numUsefulGroups += 1
+                    print_alignedGroup(group, rightPartGroup, read_R,
+                                        seqs, log)
+    return numUsefulGroups
+
+
 def findMutation(read_R, seqs, leftparts, rightparts, mismatches, first, log):
     # Test that the size of the group is big enough to infer any info
     # if (len(leftparts)+len(rightparts)) < 3:
@@ -2632,7 +2732,7 @@ def findMutation(read_R, seqs, leftparts, rightparts, mismatches, first, log):
                 # print len(read)
                 count += 1
                 firstSampleBP.add(read[mutationsPos-offset])
-        if len(firstSampleBP) == 1 and count > 1:
+        if len(firstSampleBP) == 1 and count >= requiredOverlaps:
             # logprint(log, False, "group mismatches:", firstSampleBP)
             return list(firstSampleBP)[0]
         else:
@@ -2811,7 +2911,7 @@ def alignLeft(read_R, seqs, alignedGroups, log):
     for read_L in xrange(0,len(seqs),2):
         #print seqs[read_R]
         #print seqs[read_L]
-        for alignInfo in findAlignment(seqs[read_R], seqs[read_L],
+        for alignInfo in findAlignment(read_R, read_L, seqs,
                                          readROffset, M1, log):
             #offset += len(seqs[read_R-1])
             offset, mis, lenCompared = alignInfo
