@@ -7,7 +7,7 @@ __version__ = "$Revision: 2.0"
 
 from optparse import OptionParser
 from operator import itemgetter
-#from collections import Counter, deque
+from collections import Counter, deque
 from itertools import chain
 import sys, time
 import random
@@ -1730,7 +1730,7 @@ def print_alignedGroups(groups, read_R, seqs, log):
                              sorted(rightParts))
                     logprint(log, False, "Number of right parts:",
                              len(rightParts))
-                    logprint(log, True, "mismatches:",
+                    logprint(log, False, "mismatches:",
                              list(rightPartGroup.mismatches))
                     # logprint(log, False, "Number of mismatches:",
                     #          len(rightPartGroup.mismatches))
@@ -1772,6 +1772,9 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
     seqsDiseased = getAllReads(diseased, log)
     seqs = seqsNormal + seqsDiseased
 
+    numAlignedGroups = []
+    numRightPartGroups = []
+
     numMutations1 = 0
     numMutations2 = 0
     numParts = len(candidatePairs) / 4 + 2
@@ -1792,6 +1795,12 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
             # Analyze the aligned group to find mutations
             #numMutations1 += oldFindMutation(read_R, seqs, alignedGroups,log)
             numMutations2 += newFindMutation(read_R, seqs, alignedGroups,log)
+
+            # Statistics on number of created groups
+            numAlignedGroups.append(len(alignedGroups))
+            for group in alignedGroups:
+                numRightPartGroups.append(len(group.rightPartGroups))
+            
 
             # print_alignedGroups(alignedGroups, read_R, seqs, log)
             # sys.exit()
@@ -1827,6 +1836,8 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
     logprint(log, False, "numReadR:", numreadR)
     logprint(log, False, "numMutations1:", numMutations1)
     logprint(log, False, "numMutations2:", numMutations2)
+    logprint(log, False, "counterAlignGroups:\n", Counter(numAlignedGroups))
+    logprint(log, False, "counterRightGroups:\n", Counter(numRightPartGroups))
 
 
 def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log):
