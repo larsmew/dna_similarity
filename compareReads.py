@@ -2648,7 +2648,6 @@ def newFindMutation(read_R, seqs, alignedGroups, log):
         for rightPartGroup in group.rightPartGroups:
             for pos in rightPartGroup.mismatches:
                 validBPs = 0
-                print pos
                 if pos < 0:
                     for overlaps in rightPartGroup.preConsensus[pos].values():
                         if overlaps >= requiredOverlaps:
