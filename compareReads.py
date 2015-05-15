@@ -1793,8 +1793,8 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
             alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log)
 
             # Analyze the aligned group to find mutations
-            #numMutations1 += oldFindMutation(read_R, seqs, alignedGroups,log)
-            numMutations2 += newFindMutation(read_R, seqs, alignedGroups,log)
+            numMutations1 += oldFindMutation(read_R, seqs, alignedGroups,log)
+            #numMutations2 += newFindMutation(read_R, seqs, alignedGroups,log)
 
             # Statistics on number of created groups
             numAlignedGroups.append(len(alignedGroups))
