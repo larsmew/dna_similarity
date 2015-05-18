@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 __author__ = "Lars Andersen <larsmew@gmail.com>"
-__date__ = "03/12/2014"
-__version__ = "$Revision: 2.0"
+__date__ = "19/05/2015"
+__version__ = "$Revision: 2.5"
 
 from optparse import OptionParser
 from operator import itemgetter
@@ -24,15 +24,15 @@ import resource
 leftPartRatio = 0.5
 rightPartRatio = 0.5
 printMinhashProcess = 500000
+
+# Sequence Alignment
+M1 = 1
+M2 = 1
 secondSample = 0
 overlap = 9 # Overlap region in both directions i.e. 20 overlap in total
 maxAlignments = 2 # per read
 requiredOverlaps = 3
 
-
-# Sequence Alignment
-M1 = 1
-M2 = 1
 
 # Test variables
 c1 = 0
@@ -1802,7 +1802,7 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
                 numRightPartGroups.append(len(group.rightPartGroups))
             
 
-            # print_alignedGroups(alignedGroups, read_R, seqs, log)
+            #print_alignedGroups(alignedGroups, read_R, seqs, log)
             # sys.exit()
             prog += 1
             if prog % 500 == 0:
@@ -1844,7 +1844,7 @@ def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log):
     readROffset = len(seqs[read_R-1])
     for read_L in candidatePairs[read_R]:
         if read_L < secondSample:
-            m = 0
+            m = M1
         else:
             m = M2
         for alignInfo in findAlignment(read_R, read_L, seqs,
@@ -1857,7 +1857,7 @@ def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log):
             newGroup = True
             for group in alignedGroups:
                 if fitsInGroup(group, seqs, read_R, read_L, alignInfo,
-                               offset, m):
+                               offset, M2):
                     # Add read_L to group
                     global c1
                     c1 += 1
@@ -2488,8 +2488,10 @@ def testRead(group, seqs, read_R, next_read_R, offset, m2, alignments, log):
     seq_next_read_R = seqs[next_read_R-1]+seqs[next_read_R]
 
     # Check overlapping part
-    lenToCompare = len(seq_next_read_R) - (group.leftReadsOffset - offset)
+    leftROffset = group.leftReadsOffset
+    lenToCompare = len(seq_next_read_R) - (leftROffset - offset)
     mismatches = set([mis for mis in group.mismatches])
+    m1 = 0
     for i in xrange(lenToCompare):
         # if next_read_R == 1805:
         #     print "hejhej"
@@ -2501,10 +2503,17 @@ def testRead(group, seqs, read_R, next_read_R, offset, m2, alignments, log):
         # print group.leftReadsOffset-offset+i
         # print group.consensus[i+group.leftReadsOffset].iterkeys().next()
         # print seq_next_read_R[i+group.leftReadsOffset-offset]
-        if len(group.consensus[group.leftReadsOffset+i]) > 1 or \
-                group.consensus[group.leftReadsOffset+i].iterkeys().next() \
-                != seq_next_read_R[i+group.leftReadsOffset-offset]:
-            mismatches.add(group.leftReadsOffset+i)
+        if next_read_R < secondSample and (leftROffset+i) < len(seq_read_R):
+            if seq_read_R[i+leftROffset] != \
+                   seq_next_read_R[i+leftROffset-offset]:
+                mismatches.add(leftROffset+1)
+                m1 += 1
+                if m1 > M1:
+                    return alignments
+        elif len(group.consensus[leftROffset+i]) > 1 or \
+                group.consensus[leftROffset+i].iterkeys().next() \
+                != seq_next_read_R[i+leftROffset-offset]:
+            mismatches.add(leftROffset+i)
             global c3
             c3 += 1
             # if next_read_R == 1805:
@@ -2538,7 +2547,7 @@ def testRead(group, seqs, read_R, next_read_R, offset, m2, alignments, log):
     else:
         j = 0
         k = -offset
-    for i in xrange(group.leftReadsOffset-j):
+    for i in xrange(leftROffset-j):
         # if next_read_R == 2097:
         #     print seq_read_R[i+j], seq_next_read_R[i+k]
         if seq_read_R[i+j] != seq_next_read_R[i+k]:
