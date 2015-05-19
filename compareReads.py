@@ -26,7 +26,7 @@ rightPartRatio = 0.5
 printMinhashProcess = 500000
 
 # Sequence Alignment
-M1 = 1
+M1 = 0
 M2 = 1
 secondSample = 0
 overlap = 9 # Overlap region in both directions i.e. 20 overlap in total
@@ -1793,14 +1793,14 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
             alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log)
 
             # Analyze the aligned group to find mutations
-            numMutations1 += oldFindMutation(read_R, seqs, alignedGroups,log)
-            #numMutations2 += newFindMutation(read_R, seqs, alignedGroups,log)
+            # numMutations1 += oldFindMutation(read_R, seqs, alignedGroups,log)
+            numMutations2 += newFindMutation(read_R, seqs, alignedGroups,log)
 
             # Statistics on number of created groups
             numAlignedGroups.append(len(alignedGroups))
             for group in alignedGroups:
                 numRightPartGroups.append(len(group.rightPartGroups))
-            
+
 
             #print_alignedGroups(alignedGroups, read_R, seqs, log)
             # sys.exit()
@@ -1954,7 +1954,7 @@ def findAlignment(r_R, r_L, seqs, readROffset, m, log):
         offset += 1
         lengthToCompare -= 1
     #yield -1
-    
+
     # check for alignment by shifting read_R along read_L
     # offset = 0
     # read_L_rest = seqs[r_L+1]
@@ -1998,7 +1998,7 @@ def fitsInGroup(group, seqs, read_R, read_L, alignInfo, offset, m2):
     mismatches = 0
     offset += group.readROffset
     offset2, mis, lenCompared = alignInfo
-    
+
     # yo = False
     # if offset < 50:
     #     yo = True
