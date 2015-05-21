@@ -703,7 +703,7 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log):
         #return (time.clock() - tim) / 60, memory_usage_resource()
 
         # If testing different k-values
-        if test == 0:
+        if test == 3:
             return (time.clock() - tim) / 60, memory_usage_resource()
 
         return candidatePairs
@@ -2575,7 +2575,8 @@ def testRead(group, seqs, read_R, next_read_R, offset, m2, alignments, log):
 def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
     startOnePosOverlap = True
     for group in alignedGroups:
-        if len(group.leftPartsN) < 2:
+        group.checkedRightParts.add(read_R)
+        if len(group.leftPartsN)+len(group.leftPartsD) < 3:
             # logprint(log, False, "\n\nTOO SMALL GROUP:")
             # print_leftGroup(group, read_R, seqs, log)
             global c8
@@ -2583,17 +2584,16 @@ def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
             continue
         for read_L in (group.leftPartsN.keys()+group.leftPartsD.keys()):
             for next_read_R in candidatePairs[read_L]:
-                if read_R != next_read_R and \
-                             next_read_R not in group.checkedRightParts:
+                if next_read_R not in group.checkedRightParts:
                     if startOnePosOverlap:
-                        m = M2
-                        if next_read_R < secondSample:
-                            if M2 > 0 and len(group.mismatches) < M2:
-                                m = M2-1
+                        # m = M2
+                        # if next_read_R < secondSample:
+                        #     if M2 > 0 and len(group.mismatches) < M2:
+                        #         m = M2-1
                         alignments = 0
                         seq_next_read_R = seqs[next_read_R-1] + \
                                           seqs[next_read_R]
-                        st = group.maxLeftReadsOffset
+                        #st = group.maxLeftReadsOffset
                         # for offset in xrange(group.readROffset,
                         #         st-len(seq_next_read_R), -1):
                         for offset in xrange(-overlap, overlap+1):
@@ -2613,7 +2613,7 @@ def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
                             global numreadR
                             numreadR += 1
                             alignments = testRead(group, seqs, read_R,
-                                                  next_read_R, offset, m,
+                                                  next_read_R, offset, M2,
                                                   alignments, log)
                             group.checkedRightParts.add(next_read_R)
                             if alignments == maxAlignments:
@@ -3039,13 +3039,10 @@ def main():
 
         if test == 0:
             """
-            Test different k values
+            Stop after the LSH step.
             """
-            print candidatePairs
-            if fasta_file:
-                import os
-                os.system("echo '"+str(k)+"\t"+str(candidatePairs[0])+"\t"+
-                          str(candidatePairs[1])+"' >> "+fasta_file)
+            print "Total time used:", time.clock() - totim / 60, "minutes"
+            sys.exit()
         elif test == 1:
             """
             Test S-curve distribution
@@ -3058,6 +3055,14 @@ def main():
             """
             pairsFoundByLSH(normal_file, diseased_file, candidatePairs, k,
                             bands, rows, log)
+        if test == 3:
+            """
+            Test different k values
+            """
+            if fasta_file:
+                import os
+                os.system("echo '"+str(k)+"\t"+str(candidatePairs[0])+"\t"+
+                          str(candidatePairs[1])+"' >> "+fasta_file)
         else:
             # If no test to run on LSH, continue with contructing
             #findMutations(candidatePairs, normal_file, diseased_file, log)
@@ -3067,8 +3072,8 @@ def main():
                  "minutes")
 
         return (time.clock() - totim)
-
-        sys.exit()
+        
+        ### For Testing ###
         reads = getAllReads(fasta_file, log)
 
         findSimPairs = False
