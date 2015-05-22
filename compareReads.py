@@ -31,7 +31,8 @@ M2 = 2
 secondSample = 0
 overlap = 9 # Overlap region in both directions i.e. 20 overlap in total
 maxAlignments = 2 # per read
-requiredOverlaps = 3
+requiredOverlaps = 1
+MUTFIND = 2
 
 
 # Test variables
@@ -1793,8 +1794,12 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
             alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log)
 
             # Analyze the aligned group to find mutations
-            # numMutations1 += oldFindMutation(read_R, seqs, alignedGroups,log)
-            numMutations2 += newFindMutation(read_R, seqs, alignedGroups,log)
+            if MUTFIND == 1:
+                numMutations1 += oldFindMutation(read_R, seqs,
+                                                 alignedGroups,log)
+            else:
+                numMutations2 += newFindMutation(read_R, seqs,
+                                                 alignedGroups,log)
 
             # Statistics on number of created groups
             numAlignedGroups.append(len(alignedGroups))
@@ -2665,25 +2670,32 @@ def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
 # 7 6 3 = 4
 def newFindMutation(read_R, seqs, alignedGroups, log):
     numUsefulGroups = 0
+    ancLen = len(seqs[read_R-1]+seqs[read_R])
+    misInOverlap = 0
     for group in alignedGroups:
         for rightPartGroup in group.rightPartGroups:
-            for pos in rightPartGroup.mismatches:
-                validBPs = 0
-                if pos < 0:
-                    for overlaps in rightPartGroup.preConsensus[pos].values():
+            usefulMis = False
+            for mis in rightPartGroup.mismatches:
+                validPos = 0
+                if mis < 0:
+                    for overlaps in rightPartGroup.preConsensus[mis].values():
                         if overlaps >= requiredOverlaps:
-                            validBPs += 1
+                            validPos += 1
                 else:
                     # if len(rightPartGroup.consensus[pos]) > 2:
                     #     print_alignedGroup(group, rightPartGroup, read_R,
                     #                         seqs, log)
-                    for overlaps in rightPartGroup.consensus[pos].values():
+                    for overlaps in rightPartGroup.consensus[mis].values():
                         if overlaps >= requiredOverlaps:
-                            validBPs += 1
-                if validBPs > 1:
-                    print_alignedGroup(group, rightPartGroup, read_R,
-                                        seqs, log)
-                    numUsefulGroups += 1
+                            validPos += 1
+                            if mis > group.leftReadsOffset and mis < ancLen:
+                                misInOverlap += 1
+                if validPos > 1:
+                    usefulMis = True
+            if usefulMis and misInOverlap > 0:
+                print_alignedGroup(group, rightPartGroup, read_R,
+                                    seqs, log)
+                numUsefulGroups += 1
     return numUsefulGroups
 
 
