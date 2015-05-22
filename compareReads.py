@@ -2692,10 +2692,10 @@ def newFindMutation(read_R, seqs, alignedGroups, log):
                     for overlaps in rightPartGroup.consensus[mis].values():
                         if overlaps >= requiredOverlaps:
                             validPos += 1
-                            if mis > group.leftReadsOffset and mis < ancLen:
-                                misInOverlap += 1
                 if validPos > 1:
                     usefulMis = True
+                    if mis > group.leftReadsOffset and mis < ancLen:
+                        misInOverlap += 1
             if usefulMis and misInOverlap > 0:
                 print_alignedGroup(group, rightPartGroup, read_R,
                                     seqs, log)
