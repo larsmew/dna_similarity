@@ -26,8 +26,8 @@ rightPartRatio = 0.5
 printMinhashProcess = 500000
 
 # Sequence Alignment
-M1 = 0
-M2 = 1
+M1 = 1
+M2 = 2
 secondSample = 0
 overlap = 9 # Overlap region in both directions i.e. 20 overlap in total
 maxAlignments = 2 # per read
@@ -1844,9 +1844,9 @@ def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log):
     readROffset = len(seqs[read_R-1])
     for read_L in candidatePairs[read_R]:
         if read_L < secondSample:
-            m = M1
+            m = M1  # Maybe set to 0
         else:
-            m = M2
+            m = M1
         for alignInfo in findAlignment(read_R, read_L, seqs,
                                          readROffset, m, log):
             #offset += len(seqs[read_R-1])
@@ -2503,19 +2503,20 @@ def testRead(group, seqs, read_R, next_read_R, offset, m2, alignments, log):
         # print group.leftReadsOffset-offset+i
         # print group.consensus[i+group.leftReadsOffset].iterkeys().next()
         # print seq_next_read_R[i+group.leftReadsOffset-offset]
-        if next_read_R < secondSample and (leftROffset+i) < len(seq_read_R):
-            if seq_read_R[i+leftROffset] != \
-                   seq_next_read_R[i+leftROffset-offset]:
-                mismatches.add(leftROffset+1)
-                m1 += 1
-                if m1 > M1:
-                    return alignments
-        elif len(group.consensus[leftROffset+i]) > 1 or \
+        # if next_read_R < secondSample and (leftROffset+i) < len(seq_read_R):
+        #     if seq_read_R[i+leftROffset] != \
+        #            seq_next_read_R[i+leftROffset-offset]:
+        #         mismatches.add(leftROffset+1)
+        #         m1 += 1
+        #         if m1 > M1:
+        #             return alignments
+        if len(group.consensus[leftROffset+i]) > 1 or \
                 group.consensus[leftROffset+i].iterkeys().next() \
                 != seq_next_read_R[i+leftROffset-offset]:
             mismatches.add(leftROffset+i)
             global c3
             c3 += 1
+            m1 += 1
             # if next_read_R == 1805:
             #     #print " "*-offset,
             #     print_fullConsensus([], group.consensus)
@@ -2523,7 +2524,7 @@ def testRead(group, seqs, read_R, next_read_R, offset, m2, alignments, log):
             #     print offset
             #     print "lololol"
             #     print group.consensus[group.leftReadsOffset+i].keys()[0], seq_next_read_R[i+group.leftReadsOffset-offset]
-            if len(mismatches) > m2:
+            if m1 > M1:
                 return alignments
     # print c3
     # sys.exit()
