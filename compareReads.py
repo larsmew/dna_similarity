@@ -31,7 +31,7 @@ M2 = 2
 secondSample = 0
 overlap = 9 # Overlap region in both directions i.e. 20 overlap in total
 maxAlignments = 2 # per read
-requiredOverlaps = 1
+requiredOverlaps = 3
 MUTFIND = 2
 
 
@@ -2531,6 +2531,10 @@ def testRead(group, seqs, read_R, next_read_R, offset, m2, alignments, log):
             #     print group.consensus[group.leftReadsOffset+i].keys()[0], seq_next_read_R[i+group.leftReadsOffset-offset]
             if m1 > M1:
                 return alignments
+    
+    if len(mismatches) > m2:
+        return alignments
+    
     # print c3
     # sys.exit()
     # if next_read_R == 2097:
