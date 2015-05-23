@@ -1849,7 +1849,7 @@ def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log):
     readROffset = len(seqs[read_R-1])
     for read_L in candidatePairs[read_R]:
         if read_L < secondSample:
-            m = M1  # set to 0 or M1
+            m = 0  # set to 0 or M1
         else:
             m = M1
         for alignInfo in findAlignment(read_R, read_L, seqs,
@@ -2497,7 +2497,7 @@ def testRead(group, seqs, read_R, next_read_R, offset, m2, alignments, log):
     lenToCompare = len(seq_next_read_R) - (leftROffset - offset)
     mismatches = set([mis for mis in group.mismatches])
     m1 = 0
-    #m = M1  # set to 0 or M1
+    m = 0  # set to 0 or M1
     for i in xrange(lenToCompare):
         # if next_read_R == 1805:
         #     print "hejhej"
@@ -2510,13 +2510,13 @@ def testRead(group, seqs, read_R, next_read_R, offset, m2, alignments, log):
         # print group.consensus[i+group.leftReadsOffset].iterkeys().next()
         # print seq_next_read_R[i+group.leftReadsOffset-offset]
 
-        # if next_read_R < secondSample and (leftROffset+i) < len(seq_read_R):
-        #     if seq_read_R[i+leftROffset] != \
-        #            seq_next_read_R[i+leftROffset-offset]:
-        #         mismatches.add(leftROffset+i)
-        #         m1 += 1
-        #         if m1 > m:
-        #             return alignments
+        if next_read_R < secondSample and (leftROffset+i) < len(seq_read_R):
+            if seq_read_R[i+leftROffset] != \
+                   seq_next_read_R[i+leftROffset-offset]:
+                mismatches.add(leftROffset+i)
+                m1 += 1
+                if m1 > m:
+                    return alignments
         if len(group.consensus[leftROffset+i]) > 1 or \
                 group.consensus[leftROffset+i].iterkeys().next() \
                 != seq_next_read_R[i+leftROffset-offset]:
@@ -2719,7 +2719,7 @@ def oldFindMutation(read_R, seqs, alignedGroups, log):
             for mis in rightPartGroup.mismatches:
                 if isUsefulGroup:
                     break
-                # if mis < group.leftReadsOffset or mis > anchorLen:
+                # if mis < group.leftReadsOffset or mis > anchorLen-1:
                 #     break
                 muts1 = findMutation(read_R, seqs, group.leftPartsN,
                          rightPartGroup.rightPartsN, mis, True, log)
