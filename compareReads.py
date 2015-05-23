@@ -2713,7 +2713,7 @@ def oldFindMutation(read_R, seqs, alignedGroups, log):
             for mis in rightPartGroup.mismatches:
                 if isUsefulGroup:
                     break
-                if mis < group.leftReadsOffset and mis < anchorLen:
+                if mis < group.leftReadsOffset or mis > anchorLen:
                     break
                 muts1 = findMutation(read_R, seqs, group.leftPartsN,
                          rightPartGroup.rightPartsN, mis, True, log)
