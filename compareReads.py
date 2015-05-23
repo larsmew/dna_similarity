@@ -2674,7 +2674,7 @@ def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
 # 7 6 3 = 4
 def newFindMutation(read_R, seqs, alignedGroups, log):
     numUsefulGroups = 0
-    ancLen = len(seqs[read_R-1]+seqs[read_R])
+    ancLen = len(seqs[read_R-1])+len(seqs[read_R])
     misInOverlap = 0
     for group in alignedGroups:
         for rightPartGroup in group.rightPartGroups:
@@ -2706,16 +2706,19 @@ def newFindMutation(read_R, seqs, alignedGroups, log):
 
 def oldFindMutation(read_R, seqs, alignedGroups, log):
     numUsefulGroups = 0
+    anchorLen = len(seqs[read_R-1])+len(seqs[read_R])
     for group in alignedGroups:
         for rightPartGroup in group.rightPartGroups:
             isUsefulGroup = False
-            for mutationsPos in rightPartGroup.mismatches:
+            for mis in rightPartGroup.mismatches:
                 if isUsefulGroup:
                     break
+                if mis < group.leftReadsOffset and mis < anchorLen:
+                    break
                 muts1 = findMutation(read_R, seqs, group.leftPartsN,
-                         rightPartGroup.rightPartsN, mutationsPos, True, log)
+                         rightPartGroup.rightPartsN, mis, True, log)
                 muts2 = findMutation(read_R, seqs, group.leftPartsD,
-                         rightPartGroup.rightPartsD, mutationsPos, False, log)
+                         rightPartGroup.rightPartsD, mis, False, log)
                 for mut1 in muts1:
                     for mut2 in muts2:
                         if mut1 != mut2 and not isUsefulGroup:
