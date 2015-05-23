@@ -2497,7 +2497,7 @@ def testRead(group, seqs, read_R, next_read_R, offset, m2, alignments, log):
     lenToCompare = len(seq_next_read_R) - (leftROffset - offset)
     mismatches = set([mis for mis in group.mismatches])
     m1 = 0
-    m = M1  # set to 0 or M1
+    %m = M1  # set to 0 or M1
     for i in xrange(lenToCompare):
         # if next_read_R == 1805:
         #     print "hejhej"
@@ -2509,13 +2509,14 @@ def testRead(group, seqs, read_R, next_read_R, offset, m2, alignments, log):
         # print group.leftReadsOffset-offset+i
         # print group.consensus[i+group.leftReadsOffset].iterkeys().next()
         # print seq_next_read_R[i+group.leftReadsOffset-offset]
-        if next_read_R < secondSample and (leftROffset+i) < len(seq_read_R):
-            if seq_read_R[i+leftROffset] != \
-                   seq_next_read_R[i+leftROffset-offset]:
-                mismatches.add(leftROffset+i)
-                m1 += 1
-                if m1 > m:
-                    return alignments    
+
+        # if next_read_R < secondSample and (leftROffset+i) < len(seq_read_R):
+        #     if seq_read_R[i+leftROffset] != \
+        #            seq_next_read_R[i+leftROffset-offset]:
+        #         mismatches.add(leftROffset+i)
+        #         m1 += 1
+        #         if m1 > m:
+        #             return alignments
         if len(group.consensus[leftROffset+i]) > 1 or \
                 group.consensus[leftROffset+i].iterkeys().next() \
                 != seq_next_read_R[i+leftROffset-offset]:
@@ -2536,10 +2537,10 @@ def testRead(group, seqs, read_R, next_read_R, offset, m2, alignments, log):
             else:
                 if m1 > M2:
                     return alignments
-    
+
     if len(mismatches) > m2:
         return alignments
-    
+
     # print c3
     # sys.exit()
     # if next_read_R == 2097:
@@ -3129,7 +3130,7 @@ def main():
                  "minutes")
 
         return (time.clock() - totim)
-        
+
         ### For Testing ###
         reads = getAllReads(fasta_file, log)
 
