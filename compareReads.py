@@ -2497,7 +2497,7 @@ def testRead(group, seqs, read_R, next_read_R, offset, m2, alignments, log):
     lenToCompare = len(seq_next_read_R) - (leftROffset - offset)
     mismatches = set([mis for mis in group.mismatches])
     m1 = 0
-    %m = M1  # set to 0 or M1
+    #m = M1  # set to 0 or M1
     for i in xrange(lenToCompare):
         # if next_read_R == 1805:
         #     print "hejhej"
