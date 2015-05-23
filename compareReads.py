@@ -2515,7 +2515,7 @@ def testRead(group, seqs, read_R, next_read_R, offset, m2, alignments, log):
                 mismatches.add(leftROffset+i)
                 m1 += 1
                 if m1 > m:
-                    return alignments
+                    return alignments    
         if len(group.consensus[leftROffset+i]) > 1 or \
                 group.consensus[leftROffset+i].iterkeys().next() \
                 != seq_next_read_R[i+leftROffset-offset]:
@@ -2530,8 +2530,12 @@ def testRead(group, seqs, read_R, next_read_R, offset, m2, alignments, log):
             #     print offset
             #     print "lololol"
             #     print group.consensus[group.leftReadsOffset+i].keys()[0], seq_next_read_R[i+group.leftReadsOffset-offset]
-            if m1 > M1:
-                return alignments
+            if leftROffset+i < len(seq_read_R):
+                if m1 > M1:
+                    return alignments
+            else:
+                if m1 > M2:
+                    return alignments
     
     if len(mismatches) > m2:
         return alignments
