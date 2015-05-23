@@ -1849,7 +1849,7 @@ def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log):
     readROffset = len(seqs[read_R-1])
     for read_L in candidatePairs[read_R]:
         if read_L < secondSample:
-            m = 0  # set to 0 or M1
+            m = M1  # set to 0 or M1
         else:
             m = M1
         for alignInfo in findAlignment(read_R, read_L, seqs,
@@ -2497,7 +2497,7 @@ def testRead(group, seqs, read_R, next_read_R, offset, m2, alignments, log):
     lenToCompare = len(seq_next_read_R) - (leftROffset - offset)
     mismatches = set([mis for mis in group.mismatches])
     m1 = 0
-    m = 0  # set to 0 or M1
+    m = M1  # set to 0 or M1
     for i in xrange(lenToCompare):
         # if next_read_R == 1805:
         #     print "hejhej"
