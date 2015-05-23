@@ -32,7 +32,7 @@ secondSample = 0
 overlap = 9 # Overlap region in both directions i.e. 20 overlap in total
 maxAlignments = 2 # per read
 requiredOverlaps = 3
-MUTFIND = 2
+MUTFIND = 1
 
 
 # Test variables
@@ -2700,6 +2700,7 @@ def newFindMutation(read_R, seqs, alignedGroups, log):
                 print_alignedGroup(group, rightPartGroup, read_R,
                                     seqs, log)
                 numUsefulGroups += 1
+                continue
     return numUsefulGroups
 
 
@@ -2707,75 +2708,106 @@ def oldFindMutation(read_R, seqs, alignedGroups, log):
     numUsefulGroups = 0
     for group in alignedGroups:
         for rightPartGroup in group.rightPartGroups:
-            if len(rightPartGroup.mismatches) > 0:
-                mutation1 = findMutation(read_R, seqs,
-                        group.leftPartsN, rightPartGroup.rightPartsN,
-                        rightPartGroup.mismatches, True, log)
-                if mutation1 == "Fail":
-                    continue
-                mutation2 = findMutation(read_R, seqs,
-                        group.leftPartsD, rightPartGroup.rightPartsD,
-                        rightPartGroup.mismatches, False, log)
-                if mutation2 != "Fail" and mutation1 != mutation2:
-                    numUsefulGroups += 1
-                    print_alignedGroup(group, rightPartGroup, read_R,
-                                        seqs, log)
+            isUsefulGroup = False
+            for mutationsPos in rightPartGroup.mismatches:
+                if isUsefulGroup:
+                    break
+                muts1 = findMutation(read_R, seqs, group.leftPartsN,
+                         rightPartGroup.rightPartsN, mutationsPos, True, log)
+                muts2 = findMutation(read_R, seqs, group.leftPartsD,
+                         rightPartGroup.rightPartsD, mutationsPos, False, log)
+                for mut1 in muts1:
+                    for mut2 in muts2:
+                        if mut1 != mut2 and not isUsefulGroup:
+                            isUsefulGroup = True
+                            numUsefulGroups += 1
+                            print_alignedGroup(group, rightPartGroup, read_R,
+                                                    seqs, log)
+
+            # OLD STUFF
+            # if len(rightPartGroup.mismatches) > 0:
+                # mutation1 = findMutation(read_R, seqs,
+                #         group.leftPartsN, rightPartGroup.rightPartsN,
+                #         rightPartGroup.mismatches, True, log)
+                # if mutation1 == "Fail":
+                #     continue
+                # mutation2 = findMutation(read_R, seqs,
+                #         group.leftPartsD, rightPartGroup.rightPartsD,
+                #         rightPartGroup.mismatches, False, log)
+                # if mutation2 != "Fail" and mutation1 != mutation2:
+                #     numUsefulGroups += 1
+                #     print_alignedGroup(group, rightPartGroup, read_R,
+                #                         seqs, log)
     return numUsefulGroups
 
 
-def findMutation(read_R, seqs, leftparts, rightparts, mismatches, first, log):
+def findMutation(read_R, seqs, leftparts, rightparts, mutationsPos, first, log):
     # Test that the size of the group is big enough to infer any info
     # if (len(leftparts)+len(rightparts)) < 3:
     #     return "Fail"
     count = 0
-    for mutationsPos in mismatches:
-        # print "mutPos", mutationsPos
-        firstSampleBP = set()
-        # Get bp in anchor point
-        if first and read_R < secondSample or \
-                not first and read_R > secondSample:
-            read = seqs[read_R-1]+seqs[read_R]
-            if mutationsPos > 0 and mutationsPos < len(read):
-                firstSampleBP.add(read[mutationsPos])
-        # Get bp in leftparts
-        for read_L in leftparts:
-            for offset in leftparts[read_L]:
-                offset += len(seqs[read_L])
-                if mutationsPos < offset:
-                    continue
-                read = seqs[read_L]+seqs[read_L+1]
-                if mutationsPos > len(read)+offset-1:
-                    continue
-                # print read[mutationsPos-offset-1]
-                # print read[mutationsPos-offset]
-                # print read[mutationsPos-offset+1]
-                count += 1
-                firstSampleBP.add(read[mutationsPos-offset])
-        # Get bp in rightparts
-        for next_read_R in rightparts:
-            for offset in rightparts[next_read_R]:
-                if mutationsPos < offset:
-                    continue
-                read = seqs[next_read_R-1]+seqs[next_read_R]
-                if mutationsPos > len(read)+offset-1:
-                    continue
-                # print mutationsPos-offset
-                # print read[mutationsPos-offset-1]
-                # print read[mutationsPos-offset]
-                # print read[mutationsPos-offset+1]
-                # print mutationsPos
-                # print offset
-                # print read_R
-                # print read
-                # print len(read)
-                count += 1
-                firstSampleBP.add(read[mutationsPos-offset])
-        if len(firstSampleBP) == 1 and count >= requiredOverlaps:
-            # logprint(log, False, "group mismatches:", firstSampleBP)
-            return list(firstSampleBP)[0]
-        else:
-            return "Fail"
-
+    validBPs = []
+    #for mutationsPos in mismatches:
+    # print "mutPos", mutationsPos
+    #firstSampleBP = set()
+    mutationBPsLeft = dict()
+    mutationBPsRight = dict()
+    # Get bp in anchor point
+    if first and read_R < secondSample or \
+            not first and read_R > secondSample:
+        read = seqs[read_R-1]+seqs[read_R]
+        if mutationsPos > 0 and mutationsPos < len(read):
+            #firstSampleBP.add(read[mutationsPos])
+            bp = read[mutationsPos]
+            mutationBPsRight[bp] = mutationBPsRight.get(bp, 0) + 1
+    # Get bp in leftparts
+    for read_L in leftparts:
+        for offset in leftparts[read_L]:
+            offset += len(seqs[read_L])
+            if mutationsPos < offset:
+                continue
+            read = seqs[read_L]+seqs[read_L+1]
+            if mutationsPos > len(read)+offset-1:
+                continue
+            # print read[mutationsPos-offset-1]
+            # print read[mutationsPos-offset]
+            # print read[mutationsPos-offset+1]
+            count += 1
+            #firstSampleBP.add(read[mutationsPos-offset])
+            bp = read[mutationsPos-offset]
+            mutationBPsLeft[bp] = mutationBPsLeft.get(bp, 0) + 1
+    # Get bp in rightparts
+    for next_read_R in rightparts:
+        for offset in rightparts[next_read_R]:
+            if mutationsPos < offset:
+                continue
+            read = seqs[next_read_R-1]+seqs[next_read_R]
+            if mutationsPos > len(read)+offset-1:
+                continue
+            # print mutationsPos-offset
+            # print read[mutationsPos-offset-1]
+            # print read[mutationsPos-offset]
+            # print read[mutationsPos-offset+1]
+            # print mutationsPos
+            # print offset
+            # print read_R
+            # print read
+            # print len(read)
+            count += 1
+            #firstSampleBP.add(read[mutationsPos-offset])
+            bp = read[mutationsPos-offset]
+            mutationBPsRight[bp] = mutationBPsRight.get(bp, 0) + 1
+    #if len(firstSampleBP) == 1 and count >= requiredOverlaps:
+        # logprint(log, False, "group mismatches:", firstSampleBP)
+        #return list(firstSampleBP)[0]
+    # else:
+    #     return "Fail"
+    for bp in mutationBPsRight:
+        overlapsLeft = mutationBPsLeft.get(bp, 0)
+        if overlapsLeft > 0:
+            if mutationBPsRight[bp]+overlapsLeft >= requiredOverlaps:
+                validBPs.append(bp)
+    return validBPs
 
 # ************************************************************************** #
 #                                                                            #
