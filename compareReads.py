@@ -714,7 +714,7 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log):
         # print "Size of candidatePairs", total_size(candidatePairs)/1024, "KB"
         #return (time.clock() - tim) / 60, memory_usage_resource()
 
-        # If testing different k-values
+        # If benchmarking different k-values
         if test == 3:
             return (time.clock() - tim) / 60, memory_usage_resource()
 
@@ -1935,23 +1935,22 @@ def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log):
     for i in xrange(len(alignedGroups)):
         for read_L in alignedGroups[i].leftPartsN:
             for j in xrange(i+1, len(alignedGroups)):
-                offset = alignedGroups[i].leftPartsN[read_L]
-                print offset
-                if fitsInGroup(alignedGroups[j], seqs, read_R, read_L, None,
-                               offset - group.readROffset, M2):
-                    if read_L in group.leftPartsN:
-                        group.leftPartsN[read_L].append(offset)
-                    else:
-                        group.leftPartsN[read_L] = [offset]
+                for offset in alignedGroups[i].leftPartsN[read_L]:
+                    if fitsInGroup(alignedGroups[j], seqs, read_R, read_L,
+                                 None, offset - group.readROffset, M2):
+                        if read_L in group.leftPartsN:
+                            group.leftPartsN[read_L].append(offset)
+                        else:
+                            group.leftPartsN[read_L] = [offset]
         for read_L in alignedGroups[i].leftPartsD:
             for j in xrange(i+1, len(alignedGroups)):
-                offset = alignedGroups[i].leftPartsD[read_L]
-                if fitsInGroup(alignedGroups[j], seqs, read_R, read_L, None,
-                               offset - group.readROffset, M2):
-                    if read_L in group.leftPartsD:
-                        group.leftPartsD[read_L].append(offset)
-                    else:
-                        group.leftPartsD[read_L] = [offset]
+                for offset in alignedGroups[i].leftPartsD[read_L]:
+                    if fitsInGroup(alignedGroups[j], seqs, read_R, read_L,
+                                 None, offset - group.readROffset, M2):
+                        if read_L in group.leftPartsD:
+                            group.leftPartsD[read_L].append(offset)
+                        else:
+                            group.leftPartsD[read_L] = [offset]
 
 
 def findAlignment(r_R, r_L, seqs, readROffset, m, log):
