@@ -1930,6 +1930,28 @@ def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log):
 
                 # Append new group to the other groups
                 alignedGroups.append(group)
+    
+    # TESTING - Second pass of left-parts
+    for i in xrange(len(alignedGroups)):
+        for read_L in alignedGroups[i].leftPartsN:
+            for j in xrange(i+1, len(alignedGroups)):
+                offset = alignedGroups[i].leftPartsN[read_L]
+                print offset
+                if fitsInGroup(alignedGroups[j], seqs, read_R, read_L, None,
+                               offset - group.readROffset, M2):
+                    if read_L in group.leftPartsN:
+                        group.leftPartsN[read_L].append(offset)
+                    else:
+                        group.leftPartsN[read_L] = [offset]
+        for read_L in alignedGroups[i].leftPartsD:
+            for j in xrange(i+1, len(alignedGroups)):
+                offset = alignedGroups[i].leftPartsD[read_L]
+                if fitsInGroup(alignedGroups[j], seqs, read_R, read_L, None,
+                               offset - group.readROffset, M2):
+                    if read_L in group.leftPartsD:
+                        group.leftPartsD[read_L].append(offset)
+                    else:
+                        group.leftPartsD[read_L] = [offset]
 
 
 def findAlignment(r_R, r_L, seqs, readROffset, m, log):
@@ -2013,8 +2035,15 @@ def fitsInGroup(group, seqs, read_R, read_L, alignInfo, offset, m2):
     lread_R = seqs[read_R]
     lread_L = seqs[read_L]+seqs[read_L+1]
     mismatches = 0
+    if alignInfo:
+        offset2, mis, lenCompared = alignInfo
+    else:
+        lenCompared = len(lread_R) - offset
+        mis = set()
+        for i in xrange(lenCompared):
+            if lread_R[i+offset] != lread_L[i]:
+                mis.add(i+offset+group.readROffset)
     offset += group.readROffset
-    offset2, mis, lenCompared = alignInfo
 
     # yo = False
     # if offset < 50:
