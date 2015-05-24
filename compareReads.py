@@ -171,8 +171,19 @@ def optionParse():
                       action="store",
                       dest="T",
                       help="perform test <VALUE>.")
+                      
+    parser.add_option("-o", "--required_reads_overlapping",
+                      metavar="<VALUE>",
+                      type=int,
+                      default=3,
+                      action="store",
+                      dest="o",
+                      help="perform test <VALUE>.")
 
     (options, args) = parser.parse_args()
+
+    global requiredOverlaps
+    requiredOverlaps = options.o
 
     return options.fasta_file, options.normal_file, options.diseased_file,\
            options.k, options.threshold, options.bands, options.rows,\
