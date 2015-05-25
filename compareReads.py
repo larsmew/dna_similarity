@@ -23,7 +23,7 @@ import resource
 # LSH
 leftPartRatio = 0.5
 rightPartRatio = 0.5
-printMinhashProcess = 10000
+printMinhashProcess = 1000
 
 # Sequence Alignment
 M1 = 1
