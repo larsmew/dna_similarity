@@ -1102,7 +1102,7 @@ def pairsFoundByLSH(normal, diseased, candidatePairs, k, b, r, log):
     seqsDiseased = getAllReads(diseased, log)
     seqs = seqsNormal + seqsDiseased
 
-    filename = "alligator_20K_memImpro"
+    filename = "alligator_20K_new"
     path = "lshPairsVsAllPairs/"
     f1 = open(path+"naive_pairs_all_"+filename+"_b_"+str(b)+"_r_"+
               str(r)+"_k_"+str(k)+".txt", 'w')
@@ -1136,10 +1136,15 @@ def pairsFoundByLSH(normal, diseased, candidatePairs, k, b, r, log):
         for j in xrange(1, len(seqs),2):
             if i+1 != j:
                 count += 1
-                naive = globalAlignment(seqs[i],seqs[j], 30)
+                naive = globalAlignment(seqs[i],seqs[j], 40)
                 jaccard_sets = jaccardSim(seqs[i], seqs[j], k)
                 jaccard_bags = jaccardSim(seqs[i], seqs[j], k, False)
                 #sims[(i,j)] = (naive, jaccard_sets, jaccard_bags)
+                if naive > 0.5 and jaccard_sets < 0.5:
+                    print seqs[i]
+                    print seqs[j]
+                    print naive, jaccard_sets
+                    print
                 if naive > sim_threshold:
                     truePairs_naive.add((i,j))
                     f1.write(str(i)+","+str(j)+" "+str(naive)+"\n")
