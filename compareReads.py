@@ -1102,7 +1102,7 @@ def pairsFoundByLSH(normal, diseased, candidatePairs, k, b, r, log):
     seqsDiseased = getAllReads(diseased, log)
     seqs = seqsNormal + seqsDiseased
 
-    filename = "alligator_20K_new"
+    filename = "alligator_20K_new2"
     path = "lshPairsVsAllPairs/"
     f1 = open(path+"naive_pairs_all_"+filename+"_b_"+str(b)+"_r_"+
               str(r)+"_k_"+str(k)+".txt", 'w')
@@ -1124,7 +1124,7 @@ def pairsFoundByLSH(normal, diseased, candidatePairs, k, b, r, log):
     truePairs_naive = set()
     truePairs_sets = set()
     truePairs_bags = set()
-    sim_threshold = -1
+    sim_threshold = 0.4
     doPrint = False
     tim = time.clock()
 
@@ -1148,26 +1148,34 @@ def pairsFoundByLSH(normal, diseased, candidatePairs, k, b, r, log):
                 if naive > sim_threshold:
                     truePairs_naive.add((i,j))
                     f1.write(str(i)+","+str(j)+" "+str(naive)+"\n")
-                    if i in candidatePairs:
-                        if j in candidatePairs[i]:
-                            truePairs_lsh_naive.add((i,j))
-                            f4.write(str(i)+","+str(j)+" "+str(naive)+"\n")
+                    # if i in candidatePairs:
+                    #     if j in candidatePairs[i]:
+                    #         truePairs_lsh_naive.add((i,j))
+                    #         f4.write(str(i)+","+str(j)+" "+str(naive)+"\n")
                 if jaccard_sets > sim_threshold:
                     truePairs_sets.add((i,j))
                     f2.write(str(i)+","+str(j)+" "+str(jaccard_sets)+"\n")
-                    if i in candidatePairs:
-                        if j in candidatePairs[i]:
-                            truePairs_lsh_sets.add((i,j))
-                            f5.write(str(i)+","+str(j)+" "+
-                                     str(jaccard_sets)+"\n")
+                    # if i in candidatePairs:
+                    #     if j in candidatePairs[i]:
+                    #         truePairs_lsh_sets.add((i,j))
+                    #         f5.write(str(i)+","+str(j)+" "+
+                    #                  str(jaccard_sets)+"\n")
                 if jaccard_bags > sim_threshold:
                     truePairs_bags.add((i,j))
                     f3.write(str(i)+","+str(j)+" "+str(jaccard_bags)+"\n")
-                    if i in candidatePairs:
-                        if j in candidatePairs[i]:
-                            truePairs_lsh_bags.add((i,j))
-                            f6.write(str(i)+","+str(j)+" "+
-                                     str(jaccard_bags)+"\n")
+                    # if i in candidatePairs:
+                    #     if j in candidatePairs[i]:
+                    #         truePairs_lsh_bags.add((i,j))
+                    #         f6.write(str(i)+","+str(j)+" "+
+                    #                  str(jaccard_bags)+"\n")
+                if i in candidatePairs:
+                    if j in candidatePairs[i]:
+                        truePairs_lsh_naive.add((i,j))
+                        f4.write(str(i)+","+str(j)+" "+str(naive)+"\n")
+                        truePairs_lsh_sets.add((i,j))
+                        f5.write(str(i)+","+str(j)+" "+str(jaccard_sets)+"\n")
+                        truePairs_lsh_bags.add((i,j))
+                        f6.write(str(i)+","+str(j)+" "+str(jaccard_bags)+"\n")
                 if doPrint:
                     print i,j
                     print seqs[i], seqs[j]
@@ -1209,11 +1217,11 @@ def pairsFoundByLSH(normal, diseased, candidatePairs, k, b, r, log):
     #                 truePairs_lsh_bags.add((i,j))
     #                 f6.write(str(i)+","+str(j)+" "+str(sims[(i,j)][2])+"\n")
     logprint(log, False, "Naive pairs not found by LSH\n",
-             truePairs_naive.difference(truePairs_lsh_naive))
+             len(truePairs_naive.difference(truePairs_lsh_naive)))
     logprint(log, False, "Jaccard set pairs not found by LSH\n",
-             truePairs_sets.difference(truePairs_lsh_sets))
+             len(truePairs_sets.difference(truePairs_lsh_sets)))
     logprint(log, False, "Jaccard bag pairs not found by LSH\n",
-             truePairs_bags.difference(truePairs_lsh_bags))
+             len(truePairs_bags.difference(truePairs_lsh_bags)))
     # logprint(log, False, "Number of lsh pairs:", totalPairs)
 
 
