@@ -1291,12 +1291,16 @@ def globalAlignment(dna1, dna2, t, extraInfo=False):
     while seqLength > t:
         # print seqLength, bestScore[1]
         matches = 0
+        matches2 = 0
         for i in xrange(seqLength):
             # print len(doc1.dna)-start
             if dna1[i] == dna2[i+start]:
                 matches += 1
+            if dna1[i+start] == dna2[i]:
+                matches2 += 1
         # print bestScore
         score = matches / float(seqLength)
+        score2 = matches2 / float(seqLength)
         if extraInfo:
             if score > bestScore[0]:
                 # print score, bestScore[0]
@@ -1304,9 +1308,17 @@ def globalAlignment(dna1, dna2, t, extraInfo=False):
                 bestScore = (score, matches, seqLength)
                 if bestScore[0] == 1.0:
                     return bestScore
+            if score2 > bestScore[0]:
+                bestScore = (score2, matches2, seqLength)
+                if bestScore[0] == 1.0:
+                    return bestScore
         else:
             if score > bestScore:
                 bestScore = score
+                if bestScore == 1.0:
+                    return bestScore
+            if score2 > bestScore:
+                bestScore = score2
                 if bestScore == 1.0:
                     return bestScore
         start += 1
@@ -3114,6 +3126,11 @@ def main():
     Main method of the program
     """
     totim = time.clock()
+
+    s1 = "AGCAACCAATGAAATTGATCTCCCTGTGCAAAAGCAGGAATGACCCCACC"
+    s2 = "GAATTTGCGAAATTGATCTCCCTGTGCAAAAGCAGGAATGACCCCACCAG"
+    print globalAlignment(s1, s2, 40, True)
+    sys.exit()
 
     # Parse command line options
     fasta_file, normal_file, diseased_file, k, threshold, bands, rows, \
