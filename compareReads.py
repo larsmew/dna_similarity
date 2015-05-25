@@ -29,9 +29,10 @@ printMinhashProcess = 1000
 M1 = 1
 M2 = 2
 secondSample = 0
-overlap = 9 # Overlap region in both directions i.e. 20 overlap in total
-maxAlignments = 2 # per read
+overlap = 6 # Overlap region in both directions i.e. 20 overlap in total if 10
+maxAlignments = 1 # per read
 requiredOverlaps = 3
+maxCandMates = 5000
 MUTFIND = 1
 
 
@@ -171,7 +172,7 @@ def optionParse():
                       action="store",
                       dest="T",
                       help="perform test <VALUE>.")
-                      
+
     parser.add_option("-o", "--required_reads_overlapping",
                       metavar="<VALUE>",
                       type=int,
@@ -1825,6 +1826,9 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
         # if read_R % 2 == 1:
         # if read_R == 42535:
         # if read_R == 19:
+            if len(candidatePairs[read_R]) > maxCandMates:
+                continue
+
             alignedGroups = []
 
             # Align left parts
@@ -1958,7 +1962,7 @@ def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log):
 
                 # Append new group to the other groups
                 alignedGroups.append(group)
-    
+
     # TESTING - Second pass of left-parts
     # for i in xrange(len(alignedGroups)):
     #     for read_L in alignedGroups[i].leftPartsN:
@@ -2667,6 +2671,8 @@ def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
             c8 += 1
             continue
         for read_L in (group.leftPartsN.keys()+group.leftPartsD.keys()):
+            if len(candidatePairs[read_L]) > maxCandMates:
+                continue
             for next_read_R in candidatePairs[read_L]:
                 if next_read_R not in group.checkedRightParts:
                     if startOnePosOverlap:
@@ -2680,7 +2686,7 @@ def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
                         #st = group.maxLeftReadsOffset
                         # for offset in xrange(group.readROffset,
                         #         st-len(seq_next_read_R), -1):
-                        for offset in xrange(-overlap, overlap+1):
+                        for offset in xrange(overlap, -overlap-1, -1):
                         # offset = 0
                         # for change in xrange(overlap*2+1):
                         #     if change % 2 == 0:
