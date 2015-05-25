@@ -462,6 +462,8 @@ def computeShinglesSet(fasta_file, shingles, k, log):
     """
     Computes the set of all k-shingles (k-mers) in all reads.
     """
+    if not fasta_file:
+        return shingles
     logprint(log, True, "Computing set of all shingles...")
     tim = time.clock()
     with open(fasta_file, "rU") as fasta_file:
@@ -671,6 +673,7 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log):
             shingles = set()
             shingles = computeShinglesSet(normal, shingles, k, log)
             shingles = computeShinglesSet(diseased, shingles, k, log)
+            shingles = list(shingles)
         # Use Locality-Sensitive Hashing to compute for each bands the buckets
         # with similar documents (reads) obtained by minhashing each read.
         buckets = dict()
