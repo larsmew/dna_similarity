@@ -3127,6 +3127,11 @@ def main():
     """
     totim = time.clock()
 
+    s1 = "AGTAGGAGAGCCTTGCTTATTAGGGCAATGGTGAATAGTGCTGGGAGGAA"
+    s2 = "ACTTATGGTTAGTAGGAGAGCCTTGCTTATTAGGGCAATGGTGAATAGTG"
+    print globalAlignment(s1, s2, 40, True)
+    sys.exit()
+
     # Parse command line options
     fasta_file, normal_file, diseased_file, k, threshold, bands, rows, \
          minhash_alg, seed, log_file, input_file, output_file, test \
