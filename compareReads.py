@@ -1141,9 +1141,9 @@ def pairsFoundByLSH(normal, diseased, candidatePairs, k, b, r, log):
                 jaccard_bags = jaccardSim(seqs[i], seqs[j], k, False)
                 #sims[(i,j)] = (naive, jaccard_sets, jaccard_bags)
                 if naive < 0.5 and jaccard_sets > 0.5:
-                    logprint(False, seqs[i])
-                    logprint(False, seqs[j])
-                    logprint(True, "Naive:", naive, "Jaccard:",
+                    logprint(log, False, seqs[i])
+                    logprint(log, False, seqs[j])
+                    logprint(log, True, "Naive:", naive, "Jaccard:",
                              jaccard_sets,"\n")
                 if naive > sim_threshold:
                     truePairs_naive.add((i,j))
