@@ -1129,6 +1129,7 @@ def pairsFoundByLSH(normal, diseased, candidatePairs, k, b, r, log):
     truePairs_sets = set()
     truePairs_bags = set()
     sim_threshold = 0.4
+    naive_threshold = 0.95
     doPrint = False
     tim = time.clock()
 
@@ -1149,7 +1150,7 @@ def pairsFoundByLSH(normal, diseased, candidatePairs, k, b, r, log):
                     logprint(log, False, seqs[j])
                     logprint(log, True, "Naive:", naive, "Jaccard:",
                              jaccard_sets,"\n")
-                if naive > sim_threshold:
+                if naive > naive_threshold:
                     truePairs_naive.add((i,j))
                     f1.write(str(i)+","+str(j)+" "+str(naive)+"\n")
                     # if i in candidatePairs:
