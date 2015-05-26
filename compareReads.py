@@ -1106,7 +1106,7 @@ def pairsFoundByLSH(normal, diseased, candidatePairs, k, b, r, log):
     seqsDiseased = getAllReads(diseased, log)
     seqs = seqsNormal + seqsDiseased
 
-    filename = "alligator_20K_new3"
+    filename = "alligator_20K_new4"
     path = "lshPairsVsAllPairs/"
     f1 = open(path+"naive_pairs_all_"+filename+"_b_"+str(b)+"_r_"+
               str(r)+"_k_"+str(k)+".txt", 'w')
@@ -1129,7 +1129,7 @@ def pairsFoundByLSH(normal, diseased, candidatePairs, k, b, r, log):
     truePairs_sets = set()
     truePairs_bags = set()
     sim_threshold = 0.4
-    naive_threshold = 0.95
+    naive_threshold = 0.97
     doPrint = False
     tim = time.clock()
 
