@@ -1639,8 +1639,9 @@ def print_fullConsensus(preconsensus, consensus, log=None):
                 consensusString += preconsensus[j].keys()[i]
             else:
                 consensusString += " "
-        if consensusString != "":
-            consensusString += " "
+        # Space between pre-consensus and consensus
+        # if consensusString != "":
+        #     consensusString += " "
         # Get main consensus
         for j in xrange(len(consensus)):
             if i < len(consensus[j]) and \
@@ -3192,7 +3193,7 @@ def main():
             """
             pairsFoundByLSH(normal_file, diseased_file, candidatePairs, k,
                             bands, rows, log)
-        if test == 3:
+        elif test == 3:
             """
             Test different k values
             """
