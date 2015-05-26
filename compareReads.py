@@ -1106,7 +1106,7 @@ def pairsFoundByLSH(normal, diseased, candidatePairs, k, b, r, log):
     seqsDiseased = getAllReads(diseased, log)
     seqs = seqsNormal + seqsDiseased
 
-    filename = "alligator_20K_new2"
+    filename = "alligator_20K_new3"
     path = "lshPairsVsAllPairs/"
     f1 = open(path+"naive_pairs_all_"+filename+"_b_"+str(b)+"_r_"+
               str(r)+"_k_"+str(k)+".txt", 'w')
