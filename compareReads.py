@@ -1824,8 +1824,8 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
     prog = 0
     tim = time.clock()
     for read_R in candidatePairs:
-        if read_R < secondSample and read_R % 2 == 1:
-        # if read_R % 2 == 1:
+        # if read_R < secondSample and read_R % 2 == 1:
+        if read_R % 2 == 1:
         # if read_R == 42535:
         # if read_R == 19:
             if len(candidatePairs[read_R]) > maxCandMates:
