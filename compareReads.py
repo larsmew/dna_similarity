@@ -1143,7 +1143,7 @@ def pairsFoundByLSH(normal, diseased, candidatePairs, k, b, r, log):
 		for j in xrange(1, len(seqs),2):
 			if i+1 != j:
 				count += 1
-				naive = globalAlignment(seqs[i],seqs[j], 45)
+				naive = globalAlignment(seqs[i],seqs[j], 33)
 				jaccard_sets = jaccardSim(seqs[i], seqs[j], k)
 				jaccard_bags = jaccardSim(seqs[i], seqs[j], k, False)
 				#sims[(i,j)] = (naive, jaccard_sets, jaccard_bags)
