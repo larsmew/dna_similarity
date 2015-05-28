@@ -685,8 +685,8 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log):
 			#			 minhash_alg, b, bands, log)
 			minhashing(normal, diseased, shingles, buckets, k, rows,
 					   minhash_alg, b, bands, log)
-			#lshBand(buckets, b, candidatePairs, log)
-			lshBand(buckets, b, dict(), log)
+			lshBand(buckets, b, candidatePairs, log)
+			#lshBand(buckets, b, dict(), log)
 			limit = memory_usage_resource()
 			if int(limit) > 300000:
 				break
@@ -723,7 +723,8 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log):
 
 		# If benchmarking different k-values
 		if test == 3:
-			return (time.clock() - tim) / 60, memory_usage_resource()
+			return (time.clock() - tim) / 60, memory_usage_resource(), \
+					sum(len(candidatePairs[i]) for i in candidatePairs)/2
 
 		return candidatePairs
 
@@ -3204,7 +3205,8 @@ def main():
 			if fasta_file:
 				import os
 				os.system("echo '"+str(k)+"\t"+str(candidatePairs[0])+"\t"+
-						  str(candidatePairs[1])+"' >> "+fasta_file)
+						  str(candidatePairs[1])+"\t"+
+						  str(candidatePairs[2])+"' >> "+fasta_file)
 		else:
 			# If no test to run on LSH, continue with contructing
 			#findMutations(candidatePairs, normal_file, diseased_file, log)
