@@ -685,9 +685,10 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log):
 			#			 minhash_alg, b, bands, log)
 			minhashing(normal, diseased, shingles, buckets, k, rows,
 					   minhash_alg, b, bands, log)
-			lshBand(buckets, b, candidatePairs, log)
-			hotfix = memory_usage_resource()
-			if int(hotfix) > 300000:
+			#lshBand(buckets, b, candidatePairs, log)
+			lshBand(buckets, b, dict(), log)
+			limit = memory_usage_resource()
+			if int(limit) > 300000:
 				break
 			# logprint(log, False, "Size of buckets:",
 			#		   total_size(buckets) / 1024, "KB")
