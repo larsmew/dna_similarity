@@ -2820,7 +2820,7 @@ def oldFindMutation(read_R, seqs, alignedGroups, log):
 						if mut1 != mut2 and not isUsefulGroup:
 							read = seqs[read_R]
 							print_compare(read, mis, mut1, 
-										  rightPartGroup.consens, log)
+										  rightPartGroup.consensus, log)
 							isUsefulGroup = True
 							numUsefulGroups += 1
 							print_alignedGroup(group, rightPartGroup, read_R,
