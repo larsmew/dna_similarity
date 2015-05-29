@@ -1632,6 +1632,16 @@ class RightPartGroup(object):
 		self.mismatches = set()
 
 
+def print_compare(read_R, misPos, mut, consens, log):
+	compareString = ""
+	for i in xrange(len(read_R)):
+		if i == misPos:
+			compareString += mut
+		else:
+			compareString += read_R[i]
+	logprint(log, False, "searchString:", compareString)
+
+
 def print_fullConsensus(preconsensus, consensus, log=None):
 	alphabetSize = 4
 	for i in xrange(alphabetSize):
@@ -2808,6 +2818,9 @@ def oldFindMutation(read_R, seqs, alignedGroups, log):
 				for mut1 in muts1:
 					for mut2 in muts2:
 						if mut1 != mut2 and not isUsefulGroup:
+							read = seqs[read_R]
+							print_compare(read, mis, mut1, 
+										  rightPartGroup.consens, log)
 							isUsefulGroup = True
 							numUsefulGroups += 1
 							print_alignedGroup(group, rightPartGroup, read_R,
