@@ -29,9 +29,9 @@ printMinhashProcess = 500000
 M1 = 1
 M2 = 2
 secondSample = 0
-overlap = 6 # Overlap region in both directions i.e. 20 overlap in total if 10
+overlap = 8 # Overlap region in both directions i.e. 20 overlap in total if 10
 maxAlignments = 1 # per read
-requiredOverlaps = 3
+requiredOverlaps = 4
 maxCandMates = 5000
 MUTFIND = 1
 
