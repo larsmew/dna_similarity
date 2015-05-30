@@ -2805,6 +2805,10 @@ def oldFindMutation(read_R, seqs, alignedGroups, log):
 	anchorLen = len(seqs[read_R-1])+len(seqs[read_R])
 	for group in alignedGroups:
 		for rightPartGroup in group.rightPartGroups:
+			if len(group.leftPartsN)+len(rightPartGroup.rightPartsN) <= requiredOverlaps:
+				continue
+			if len(group.leftPartsD)+len(rightPartGroup.rightPartsD) <= requiredOverlaps:
+				continue
 			isUsefulGroup = False
 			for mis in rightPartGroup.mismatches:
 				if isUsefulGroup:
