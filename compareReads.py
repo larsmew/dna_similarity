@@ -1647,13 +1647,13 @@ def print_fullConsensus(preconsensus, consensus, log=None):
 	for i in xrange(alphabetSize):
 		consensusString = ""
 		# Get pre-consensus
-		for j in xrange(len(preconsensus)):
-			if i < len(preconsensus[j]) and \
-					preconsensus[j][preconsensus[j].keys()[i]] >= \
-					requiredOverlaps:
-				consensusString += preconsensus[j].keys()[i]
-			else:
-				consensusString += " "
+		# for j in xrange(len(preconsensus)):
+		# 	if i < len(preconsensus[j]) and \
+		# 			preconsensus[j][preconsensus[j].keys()[i]] >= \
+		# 			requiredOverlaps:
+		# 		consensusString += preconsensus[j].keys()[i]
+		# 	else:
+		# 		consensusString += " "
 		# Space between pre-consensus and consensus
 		# if consensusString != "":
 		#	  consensusString += " "
