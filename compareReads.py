@@ -766,7 +766,27 @@ def getDocShingles(dna, k, asSet=True):
 		shingles = {dna[i:i+k] for i in xrange(len(dna)-k+1)}
 	else: # as list
 		shingles = [dna[i:i+k] for i in xrange(len(dna)-k+1)]
+	
+	index = []
+	for shingle in shingles:
+		index.append(toBase10(shingle))
+	
+	return index
 	return shingles
+
+
+def toBase10(seq):
+    """Compute the number from base 4 to base b."""
+    digits = []
+    for s in seq:
+        if s == "A": digits.append(0)
+        if s == "C": digits.append(1)
+        if s == "G": digits.append(2)
+        if s == "T": digits.append(3)
+    n = 0
+    for d in digits:
+        n = 4 * n + d
+    return n
 
 
 def minhashing(normal, diseased, shingles, buckets, k, rows, minhash_alg, bn, bs, p, log):
@@ -800,6 +820,8 @@ def minhashing(normal, diseased, shingles, buckets, k, rows, minhash_alg, bn, bs
 			minhashing_alg4(part, idx, shingles, buckets, k, rows, p, a, b)
 		elif minhash_alg == 5:
 			minhashing_alg5(part, idx, shingles, buckets, k, rows, p, a, b)
+		elif minhash_alg == 7:
+			minhashing_alg7(part, idx, shingles, buckets, k, rows, p, a, b)
 		else:  # Default to minhash alg 6
 			minhashing_alg6(part, idx, shingles, buckets, k, rows, p, a, b)
 		idx += 1
@@ -1054,6 +1076,36 @@ def minhashing_alg6(dna, idx, shingles, buckets, k, rows, p, a, b):
 		minVal = numShingles+1
 		for shingle in docShingles:
 			pos = shingles[shingle]
+			val = ((a[i]*pos+b[i]) % p) % numShingles
+			if val < minVal:
+				minVal = val
+		signature.append(minVal)
+	#print signature
+
+	key = ','.join(map(str, signature))
+	if key in buckets:
+		buckets[key].append(idx)
+	else:
+		buckets[key] = [idx]
+
+
+def minhashing_alg7(dna, idx, shingles, buckets, k, rows, p, a, b):
+	"""
+	Uses hash functions in the form ((a*pos+b) mod p) mod N,
+	where a and b random integers and p is prime and p > N.
+	Computes original position of shingle by finding all shingles and
+	enumerating them, then store them in a table for fast look up.
+	Table is called shingles.
+	"""
+	# Find signature for each document
+	signature = []
+	#signature = array.array('l')
+	docShingles = getDocShingles(dna, k)
+	numShingles = 4**k
+	for i in xrange(rows):
+		minVal = numShingles+1
+		for pos in docShingles:
+			#pos = shingles[shingle]
 			val = ((a[i]*pos+b[i]) % p) % numShingles
 			if val < minVal:
 				minVal = val
