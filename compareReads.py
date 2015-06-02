@@ -781,18 +781,19 @@ def getDocShingles(dna, k, asSet=True):
 
 
 def toBase10(seq):
-    """Compute the number from base 4 to base b."""
-    digits = []
-    for s in seq:
-        if s == "A": digits.append(0)
-        if s == "C": digits.append(1)
-        if s == "G": digits.append(2)
-        if s == "T": digits.append(3)
-    n = 0
-    for d in digits:
-        n = 4 * n + d
-    return n
+	"""Compute the number from base 4 to base b."""
+	#digits = []
+	n = 0
+	for s in seq:
+		if s == "A": i = 0
+		if s == "C": i = 1
+		if s == "G": i = 2
+		if s == "T": i = 3
+		n = 4 * n + i
+	return n
 
+
+#def simpleHash():
 
 def minhashing(normal, diseased, shingles, buckets, k, rows, minhash_alg, bn, bs, p, log):
 	tim = time.clock()
@@ -834,10 +835,10 @@ def minhashing(normal, diseased, shingles, buckets, k, rows, minhash_alg, bn, bs
 			minhashing_alg6(part, idx, shingles, buckets, k, rows, p, a, b)
 		idx += 1
 
-		# if idx % printMinhashProcess == 0:
-		# 	logprint(log, True, "Band", bn+1, "of", str(bs)+":",
-		# 			 "Processed", idx, "documents in",
-		# 			 (time.clock() - tim) / 60, "minutes")
+		if idx % printMinhashProcess == 0:
+			logprint(log, True, "Band", bn+1, "of", str(bs)+":",
+					 "Processed", idx, "documents in",
+					 (time.clock() - tim) / 60, "minutes")
 
 	global secondSample
 	if secondSample == 0:
@@ -854,19 +855,21 @@ def minhashing(normal, diseased, shingles, buckets, k, rows, minhash_alg, bn, bs
 			minhashing_alg4(part, idx, shingles, buckets, k, rows, p, a, b)
 		elif minhash_alg == 5:
 			minhashing_alg5(part, idx, shingles, buckets, k, rows, p, a, b)
+		elif minhash_alg == 7:
+			minhashing_alg7(part, idx, shingles, buckets, k, rows, p, a, b)
 		else:  # Default to minhash alg 6
 			minhashing_alg6(part, idx, shingles, buckets, k, rows, p, a, b)
 
 		idx += 1
 
-	# 	if idx % printMinhashProcess == 0:
-	# 		logprint(log, True, "Band", bn+1, "of", str(bs)+":",
-	# 				 "Processed", idx, "documents in",
-	# 				 (time.clock() - tim) / 60, "minutes")
-	#
-	# logprint(log, False, "Finished minhashing in",
-	# 		 (time.clock() - tim) / 60, "minutes")
-	# logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
+		if idx % printMinhashProcess == 0:
+			logprint(log, True, "Band", bn+1, "of", str(bs)+":",
+					 "Processed", idx, "documents in",
+					 (time.clock() - tim) / 60, "minutes")
+
+	logprint(log, False, "Finished minhashing in",
+			 (time.clock() - tim) / 60, "minutes")
+	logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
 	return idx
 
 
