@@ -687,7 +687,7 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log):
 			5. Through whole matrix (according to the book)
 			6. Through all documents shingles
 	"""
-	multiProcessing = True
+	multiProcessing = False
 	# Check if files are provided
 	if normal or diseased:
 		tim = time.clock()
@@ -767,11 +767,12 @@ def getDocShingles(dna, k, asSet=True):
 	else: # as list
 		shingles = [dna[i:i+k] for i in xrange(len(dna)-k+1)]
 	
-	index = []
-	for shingle in shingles:
-		index.append(toBase10(shingle))
-	
-	return index
+	if not asSet:
+		index = []
+		for shingle in shingles:
+			index.append(toBase10(shingle))
+		return index
+
 	return shingles
 
 
@@ -1100,7 +1101,7 @@ def minhashing_alg7(dna, idx, shingles, buckets, k, rows, p, a, b):
 	# Find signature for each document
 	signature = []
 	#signature = array.array('l')
-	docShingles = getDocShingles(dna, k)
+	docShingles = getDocShingles(dna, k, False)
 	numShingles = 4**k
 	for i in xrange(rows):
 		minVal = numShingles+1
