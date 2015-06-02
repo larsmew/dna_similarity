@@ -9,6 +9,7 @@ from optparse import OptionParser
 from operator import itemgetter
 from collections import Counter, deque
 from itertools import chain
+from multiprocessing import Pool
 import sys, time
 import random
 import gc
@@ -606,7 +607,7 @@ def getPartsFromFile(fasta_file, log):
 	in the given fasta file.
 	"""
 	if fasta_file:
-		with open(fasta_file, "rU") as fasta_file:
+		with open(fasta_file, "r") as fasta_file:
 			read = ""
 			for line in fasta_file:
 				# If line starts with ">", which indicates end of a sequence, append it to list of reads
@@ -665,6 +666,15 @@ def getPrime(offset):
 #						  Locality Sensitive Hashing						 #
 #																			 #
 # ************************************************************************** #
+def doWork(tup):
+	normal, diseased, shingles, k, rows, minhash_alg, b, bands, p = tup
+	buckets = dict()
+	minhashing(normal, diseased, shingles, buckets, k, rows,
+			   minhash_alg, b, bands, p, None)
+	#lshBand(buckets, b, candidatePairs, log)
+	print len(buckets)
+
+
 def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log):
 	"""
 	Minhash algorithms:
@@ -677,6 +687,7 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log):
 			5. Through whole matrix (according to the book)
 			6. Through all documents shingles
 	"""
+	multiProcessing = True
 	# Check if files are provided
 	if normal or diseased:
 		tim = time.clock()
@@ -699,40 +710,34 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log):
 			shingles = list(shingles)
 		# Use Locality-Sensitive Hashing to compute for each bands the buckets
 		# with similar documents (reads) obtained by minhashing each read.
-		buckets = dict()
-		for b in xrange(bands):
-			#buckets = dict()
-			#candidatePairs = dict()
-			# minhashing(fasta_file, shingles, buckets, k, rows,
-			#			 minhash_alg, b, bands, log)
-			minhashing(normal, diseased, shingles, buckets, k, rows,
-					   minhash_alg, b, bands, log)
-			lshBand(buckets, b, candidatePairs, log)
-			#lshBand(buckets, b, dict(), log)
-			limit = memory_usage_resource()
-			if int(limit) > 300000:
-				break
-			# logprint(log, False, "Size of buckets:",
-			#		   total_size(buckets) / 1024, "KB")
-			# logprint(log, False, "Size of candidatePairs",
-			#		   total_size(candidatePairs)/1024, "KB")
-			buckets.clear()
+		p = getPrime(len(shingles))
+		if not multiProcessing:
+			for b in xrange(bands):
+				buckets = dict()
+				minhashing(normal, diseased, shingles, buckets, k, rows,
+						   minhash_alg, b, bands, p, log)
+				print len(buckets)
+				#lshBand(buckets, b, candidatePairs, log)
+			
+				# Stop if memory limit reached
+				# limit = memory_usage_resource()
+				# if int(limit) > 300000:
+				# 	break
 
-			# for idx in candidatePairs:
-			#	  try:
-			#		  data = candDisk[idx]
-			#	  except KeyError:
-			#		  pass
-			#	  candidatePairs[idx].add(data)
-			#	  candDisk[idx] = candidatePairs[idx]
-		# buckets = dict()
-		# minhashing(normal, diseased, shingles, buckets, k, rows,
-		#			 minhash_alg, 1, bands, log)
-		# lshBand(buckets, 1, candidatePairs, log)
+				# for idx in candidatePairs:
+				#	  try:
+				#		  data = candDisk[idx]
+				#	  except KeyError:
+				#		  pass
+				#	  candidatePairs[idx].add(data)
+				#	  candDisk[idx] = candidatePairs[idx]
+		
+		if multiProcessing:
+			pool = Pool(processes=bands)
+			paras = [(normal, diseased, shingles, k, rows,
+				   minhash_alg, b, bands, p) for b in range(bands)]
+			results = pool.map(doWork, paras)
 
-		# Convert sets to lists for memory effciency
-		# for id1 in candidatePairs:
-		#	  candidatePairs[id1] = list(candidatePairs[id1])
 
 		logprint(log, False, "\nNumber of unique candidate pairs",
 				 sum(len(candidatePairs[i]) for i in candidatePairs)/2)
@@ -740,8 +745,6 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log):
 				 (time.clock() - tim) / 60, "minutes")
 		logprint(log, True, "Memory usage (in mb):", memory_usage_resource(),
 				 "\n")
-		# print "Size of candidatePairs", total_size(candidatePairs)/1024, "KB"
-		#return (time.clock() - tim) / 60, memory_usage_resource()
 
 		# If benchmarking different k-values
 		if test == 3:
@@ -766,9 +769,10 @@ def getDocShingles(dna, k, asSet=True):
 	return shingles
 
 
-def minhashing(normal, diseased, shingles, buckets, k, rows, minhash_alg, bn, bs, log):
+def minhashing(normal, diseased, shingles, buckets, k, rows, minhash_alg, bn, bs, p, log):
 	tim = time.clock()
-	logprint(log, True, "Minhashing...")
+	random.seed(bn)
+	#logprint(log, True, "Minhashing...")
 
 	# minhashAlg = { '1' : minhashing_alg1,
 	#				 '2' : minhashing_alg2,
@@ -783,7 +787,6 @@ def minhashing(normal, diseased, shingles, buckets, k, rows, minhash_alg, bn, bs
 		hashfuncs = computeHashFunctions(rows, shingles, log)
 	else:
 		numShingles = len(shingles)
-		p = getPrime(numShingles)
 		a = [random.randrange(1, numShingles) for i in xrange(rows)]
 		b = [random.randrange(numShingles) for i in xrange(rows)]
 	for part in getPartsFromFile(normal, log):
@@ -826,14 +829,14 @@ def minhashing(normal, diseased, shingles, buckets, k, rows, minhash_alg, bn, bs
 
 		idx += 1
 
-		if idx % printMinhashProcess == 0:
-			logprint(log, True, "Band", bn+1, "of", str(bs)+":",
-					 "Processed", idx, "documents in",
-					 (time.clock() - tim) / 60, "minutes")
-
-	logprint(log, False, "Finished minhashing in",
-			 (time.clock() - tim) / 60, "minutes")
-	logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
+	# 	if idx % printMinhashProcess == 0:
+	# 		logprint(log, True, "Band", bn+1, "of", str(bs)+":",
+	# 				 "Processed", idx, "documents in",
+	# 				 (time.clock() - tim) / 60, "minutes")
+	#
+	# logprint(log, False, "Finished minhashing in",
+	# 		 (time.clock() - tim) / 60, "minutes")
+	# logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
 	return idx
 
 
