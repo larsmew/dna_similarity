@@ -694,13 +694,17 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log):
 		random.seed(seed)
 		candidatePairs = dict()
 		#candDisk = shelve.open("testDictDisk")
-
+		
+		if minhash_alg == 7:
+			p = getPrime(4**k)
+			shingles = None
 		# Computes table of all k-shingles and their position
-		if minhash_alg == 3 or minhash_alg > 5:
+		elif minhash_alg == 3 or minhash_alg > 5:
 			# shingles = computeShinglesTable(fasta_file, k, log)
 			shingles = dict()
 			shingles = computeShinglesTable(normal, shingles, k, log)
 			shingles = computeShinglesTable(diseased, shingles, k, log)
+			p = getPrime(len(shingles))
 		# Computes set of all k-shingles
 		else:  # minhash alg 1, 2, 4 or 5
 			# shingles = computeShinglesSet(fasta_file, k, log)
@@ -708,9 +712,9 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log):
 			shingles = computeShinglesSet(normal, shingles, k, log)
 			shingles = computeShinglesSet(diseased, shingles, k, log)
 			shingles = list(shingles)
+			p = getPrime(len(shingles))
 		# Use Locality-Sensitive Hashing to compute for each bands the buckets
 		# with similar documents (reads) obtained by minhashing each read.
-		p = getPrime(len(shingles))
 		if not multiProcessing:
 			for b in xrange(bands):
 				buckets = dict()
@@ -807,7 +811,10 @@ def minhashing(normal, diseased, shingles, buckets, k, rows, minhash_alg, bn, bs
 	if minhash_alg < 4:
 		hashfuncs = computeHashFunctions(rows, shingles, log)
 	else:
-		numShingles = len(shingles)
+		if minhash_alg == 7:
+			numShingles = 4**k
+		else:
+			numShingles = len(shingles)
 		a = [random.randrange(1, numShingles) for i in xrange(rows)]
 		b = [random.randrange(numShingles) for i in xrange(rows)]
 	for part in getPartsFromFile(normal, log):
@@ -1104,7 +1111,7 @@ def minhashing_alg7(dna, idx, shingles, buckets, k, rows, p, a, b):
 	docShingles = getDocShingles(dna, k, False)
 	numShingles = 4**k
 	for i in xrange(rows):
-		minVal = numShingles+1
+		minVal = numShingles
 		for pos in docShingles:
 			#pos = shingles[shingle]
 			val = ((a[i]*pos+b[i]) % p) % numShingles
