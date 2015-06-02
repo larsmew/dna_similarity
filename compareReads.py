@@ -184,7 +184,7 @@ def optionParse():
 	parser.add_option("-o", "--mismatch_overlap",
 					  metavar="<VALUE>",
 					  type=int,
-					  default=3,
+					  default=1,
 					  action="store",
 					  dest="o",
 					  help="Number of allowed mismatches in overlap.")
@@ -192,7 +192,7 @@ def optionParse():
 	parser.add_option("-g", "--mismatch_group",
 					  metavar="<VALUE>",
 					  type=int,
-					  default=3,
+					  default=2,
 					  action="store",
 					  dest="g",
 					  help="Number of allowed mismatches in group.")
@@ -1668,7 +1668,9 @@ def print_fullConsensus(preconsensus, consensus, log=None):
 	alphabetSize = 4
 	for i in xrange(alphabetSize):
 		consensusString = ""
-		# Get pre-consensus
+		# pre-consensus
+		for j in xrange(len(preconsensus)):
+			consensusString += " "
 		# for j in xrange(len(preconsensus)):
 		# 	if i < len(preconsensus[j]) and \
 		# 			preconsensus[j][preconsensus[j].keys()[i]] >= \
@@ -2702,12 +2704,12 @@ def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
 	startOnePosOverlap = True
 	for group in alignedGroups:
 		group.checkedRightParts.add(read_R)
-		if len(group.leftPartsN)+len(group.leftPartsD) < 3:
-			# logprint(log, False, "\n\nTOO SMALL GROUP:")
-			# print_leftGroup(group, read_R, seqs, log)
-			global c8
-			c8 += 1
-			continue
+		# if len(group.leftPartsN)+len(group.leftPartsD) < 3:
+		# 	# logprint(log, False, "\n\nTOO SMALL GROUP:")
+		# 	# print_leftGroup(group, read_R, seqs, log)
+		# 	global c8
+		# 	c8 += 1
+		# 	continue
 		for read_L in (group.leftPartsN.keys()+group.leftPartsD.keys()):
 			if len(candidatePairs[read_L]) > maxCandMates:
 				continue
@@ -2827,9 +2829,12 @@ def oldFindMutation(read_R, seqs, alignedGroups, log):
 	anchorLen = len(seqs[read_R-1])+len(seqs[read_R])
 	for group in alignedGroups:
 		for rightPartGroup in group.rightPartGroups:
-			if len(group.leftPartsN)+len(rightPartGroup.rightPartsN) <= requiredOverlaps:
+			# Check if groups contains enough information to analyze
+			numNormal = len(group.leftPartsN)+len(rightPartGroup.rightPartsN)
+			if numNormal+1 < requiredOverlaps:
 				continue
-			if len(group.leftPartsD)+len(rightPartGroup.rightPartsD) <= requiredOverlaps:
+			numDiseas = len(group.leftPartsD)+len(rightPartGroup.rightPartsD)
+			if numDiseas < requiredOverlaps:
 				continue
 			isUsefulGroup = False
 			for mis in rightPartGroup.mismatches:
@@ -2932,10 +2937,12 @@ def findMutation(read_R, seqs, leftparts, rightparts, mutationsPos, first, log):
 	#	  return "Fail"
 	for bp in mutationBPsRight:
 		overlapsLeft = mutationBPsLeft.get(bp, 0)
+		#print "HEJ", mutationBPsRight[bp]+overlapsLeft
 		if overlapsLeft > 0:
 			if mutationBPsRight[bp]+overlapsLeft >= requiredOverlaps:
 				validBPs.append(bp)
 	return validBPs
+
 
 # ************************************************************************** #
 #																			 #
