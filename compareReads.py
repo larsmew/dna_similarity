@@ -173,18 +173,40 @@ def optionParse():
 					  dest="T",
 					  help="perform test <VALUE>.")
 
-	parser.add_option("-o", "--required_reads_overlapping",
+	parser.add_option("-S", "--supporting_reads",
+					  metavar="<VALUE>",
+					  type=int,
+					  default=3,
+					  action="store",
+					  dest="S",
+					  help="Reads required to support mutation.")
+	
+	parser.add_option("-o", "--mismatch_overlap",
 					  metavar="<VALUE>",
 					  type=int,
 					  default=3,
 					  action="store",
 					  dest="o",
-					  help="perform test <VALUE>.")
+					  help="Number of allowed mismatches in overlap.")
+	
+	parser.add_option("-g", "--mismatch_group",
+					  metavar="<VALUE>",
+					  type=int,
+					  default=3,
+					  action="store",
+					  dest="g",
+					  help="Number of allowed mismatches in group.")
+					  
+	
 
 	(options, args) = parser.parse_args()
 
 	global requiredOverlaps
-	requiredOverlaps = options.o
+	requiredOverlaps = options.S
+	global M1
+	M1 = options.o
+	global M2
+	M2 = options.g
 
 	return options.fasta_file, options.normal_file, options.diseased_file,\
 		   options.k, options.threshold, options.bands, options.rows,\
