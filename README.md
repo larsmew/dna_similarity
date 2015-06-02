@@ -53,10 +53,10 @@ Example usage:
       >>> python compareReads.py -n normal_reads.fasta -d diseased_reads.fasta -k 12 -b 2 -r 5 -l log.txt -S 3 -o 1 -g 2
       
       Computing table of shingles positions...      
-      Computing table of shingles positions...
       Finished computation of shingles table in 6.61666666667e-06 minutes
-      Number of shingles: 47
+      Number of k-mers: 47
       Memory usage (in mb): 49.8515625
+      
       Minhashing...
       Finished minhashing in 0.000328633333333 minutes
       Memory usage (in mb): 50.703125
@@ -76,9 +76,9 @@ Example usage:
       Finished LSH in 0.000569666666667 minutes
       Memory usage (in mb): 50.83984375 
       
-      Collecting reads from file ../Data/Fasta/small_normal.fasta
+      Collecting reads from file fasta files
       Finished reading in 2.81666666667e-06 minutes
-      Found 5 sequences in fasta file
+      Found 5 sequences in fasta files
       Memory usage (in mb): 50.83984375
       
       read_R: 3
