@@ -804,10 +804,10 @@ def minhashing(normal, diseased, shingles, buckets, k, rows, minhash_alg, bn, bs
 			minhashing_alg6(part, idx, shingles, buckets, k, rows, p, a, b)
 		idx += 1
 
-		if idx % printMinhashProcess == 0:
-			logprint(log, True, "Band", bn+1, "of", str(bs)+":",
-					 "Processed", idx, "documents in",
-					 (time.clock() - tim) / 60, "minutes")
+		# if idx % printMinhashProcess == 0:
+		# 	logprint(log, True, "Band", bn+1, "of", str(bs)+":",
+		# 			 "Processed", idx, "documents in",
+		# 			 (time.clock() - tim) / 60, "minutes")
 
 	global secondSample
 	if secondSample == 0:
