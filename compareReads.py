@@ -769,13 +769,13 @@ def getDocShingles(dna, k, asSet=True):
 	if asSet:
 		shingles = {dna[i:i+k] for i in xrange(len(dna)-k+1)}
 	else: # as list
-		shingles = [dna[i:i+k] for i in xrange(len(dna)-k+1)]
+		shingles = [toBase10(dna[i:i+k]) for i in xrange(len(dna)-k+1)]
 	
-	if not asSet:
-		index = []
-		for shingle in shingles:
-			index.append(toBase10(shingle))
-		return index
+	# if not asSet:
+	# 	index = []
+	# 	for shingle in shingles:
+	# 		index.append(toBase10(shingle))
+	# 	return index
 
 	return shingles
 
@@ -793,7 +793,13 @@ def toBase10(seq):
 	return n
 
 
-#def simpleHash():
+def simpleHash(seq, numShingles):
+	n = 0
+	for s in seq:
+		n += ord(s)
+	n = n % numShingles
+	return n
+
 
 def minhashing(normal, diseased, shingles, buckets, k, rows, minhash_alg, bn, bs, p, log):
 	tim = time.clock()
@@ -830,15 +836,15 @@ def minhashing(normal, diseased, shingles, buckets, k, rows, minhash_alg, bn, bs
 		elif minhash_alg == 5:
 			minhashing_alg5(part, idx, shingles, buckets, k, rows, p, a, b)
 		elif minhash_alg == 7:
-			minhashing_alg7(part, idx, shingles, buckets, k, rows, p, a, b)
+			minhashing_alg7(part, idx, shingles, buckets, k, rows, p, a, b, numShingles)
 		else:  # Default to minhash alg 6
-			minhashing_alg6(part, idx, shingles, buckets, k, rows, p, a, b)
+			minhashing_alg6(part, idx, shingles, buckets, k, rows, p, a, b, numShingles)
 		idx += 1
 
-		if idx % printMinhashProcess == 0:
-			logprint(log, True, "Band", bn+1, "of", str(bs)+":",
-					 "Processed", idx, "documents in",
-					 (time.clock() - tim) / 60, "minutes")
+		# if idx % printMinhashProcess == 0:
+		# 	logprint(log, True, "Band", bn+1, "of", str(bs)+":",
+		# 			 "Processed", idx, "documents in",
+		# 			 (time.clock() - tim) / 60, "minutes")
 
 	global secondSample
 	if secondSample == 0:
@@ -856,20 +862,20 @@ def minhashing(normal, diseased, shingles, buckets, k, rows, minhash_alg, bn, bs
 		elif minhash_alg == 5:
 			minhashing_alg5(part, idx, shingles, buckets, k, rows, p, a, b)
 		elif minhash_alg == 7:
-			minhashing_alg7(part, idx, shingles, buckets, k, rows, p, a, b)
+			minhashing_alg7(part, idx, shingles, buckets, k, rows, p, a, b, numShingles)
 		else:  # Default to minhash alg 6
-			minhashing_alg6(part, idx, shingles, buckets, k, rows, p, a, b)
+			minhashing_alg6(part, idx, shingles, buckets, k, rows, p, a, b, numShingles)
 
 		idx += 1
 
-		if idx % printMinhashProcess == 0:
-			logprint(log, True, "Band", bn+1, "of", str(bs)+":",
-					 "Processed", idx, "documents in",
-					 (time.clock() - tim) / 60, "minutes")
-
-	logprint(log, False, "Finished minhashing in",
-			 (time.clock() - tim) / 60, "minutes")
-	logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
+	# 	if idx % printMinhashProcess == 0:
+	# 		logprint(log, True, "Band", bn+1, "of", str(bs)+":",
+	# 				 "Processed", idx, "documents in",
+	# 				 (time.clock() - tim) / 60, "minutes")
+	#
+	# logprint(log, False, "Finished minhashing in",
+	# 		 (time.clock() - tim) / 60, "minutes")
+	# logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
 	return idx
 
 
@@ -1069,7 +1075,7 @@ def minhashing_alg5(dna, idx, shingles, buckets, k, rows, p, a, b):
 		buckets[key] = [idx]
 
 
-def minhashing_alg6(dna, idx, shingles, buckets, k, rows, p, a, b):
+def minhashing_alg6(dna, idx, shingles, buckets, k, rows, p, a, b, n):
 	"""
 	DEFAULT MINHASH ALGORITHM
 	Uses hash functions in the form ((a*pos+b) mod p) mod N,
@@ -1082,12 +1088,12 @@ def minhashing_alg6(dna, idx, shingles, buckets, k, rows, p, a, b):
 	signature = []
 	#signature = array.array('l')
 	docShingles = getDocShingles(dna, k)
-	numShingles = len(shingles)
+	#numShingles = len(shingles)
 	for i in xrange(rows):
-		minVal = numShingles+1
+		minVal = n
 		for shingle in docShingles:
 			pos = shingles[shingle]
-			val = ((a[i]*pos+b[i]) % p) % numShingles
+			val = ((a[i]*pos+b[i]) % p) % n
 			if val < minVal:
 				minVal = val
 		signature.append(minVal)
@@ -1100,7 +1106,7 @@ def minhashing_alg6(dna, idx, shingles, buckets, k, rows, p, a, b):
 		buckets[key] = [idx]
 
 
-def minhashing_alg7(dna, idx, shingles, buckets, k, rows, p, a, b):
+def minhashing_alg7(dna, idx, shingles, buckets, k, rows, p, a, b, n):
 	"""
 	Uses hash functions in the form ((a*pos+b) mod p) mod N,
 	where a and b random integers and p is prime and p > N.
@@ -1112,12 +1118,11 @@ def minhashing_alg7(dna, idx, shingles, buckets, k, rows, p, a, b):
 	signature = []
 	#signature = array.array('l')
 	docShingles = getDocShingles(dna, k, False)
-	numShingles = 4**k
 	for i in xrange(rows):
-		minVal = numShingles
+		minVal = n
 		for pos in docShingles:
 			#pos = shingles[shingle]
-			val = ((a[i]*pos+b[i]) % p) % numShingles
+			val = ((a[i]*pos+b[i]) % p) % n
 			if val < minVal:
 				minVal = val
 		signature.append(minVal)
