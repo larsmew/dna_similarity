@@ -687,7 +687,7 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log):
 			5. Through whole matrix (according to the book)
 			6. Through all documents shingles
 	"""
-	multiProcessing = False
+	multiProcessing = True
 	# Check if files are provided
 	if normal or diseased:
 		tim = time.clock()
