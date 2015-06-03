@@ -786,9 +786,9 @@ def toBase10(seq):
 	n = 0
 	for s in seq:
 		if s == "A": i = 0
-		if s == "C": i = 1
-		if s == "G": i = 2
-		if s == "T": i = 3
+		elif s == "C": i = 1
+		elif s == "G": i = 2
+		elif s == "T": i = 3
 		n = 4 * n + i
 	return n
 
