@@ -3461,11 +3461,11 @@ def main():
 		else:
 			# candidatePairs = runLSH(fasta_file, bands, rows, n, k, seed,
 			#						  minhash_alg, log)
-			multiProcessing = False
+			multiProcessing = True
 			if multiProcessing:
 				r = redis.StrictRedis()
 				r.flushdb()
-				p_size = 20 # bands
+				p_size = bands
 				pool = Pool(processes=p_size)
 				#pool = None
 				candidatePairs = runLSH(normal_file, diseased_file, bands,
