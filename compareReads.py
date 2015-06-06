@@ -10,7 +10,7 @@ from operator import itemgetter
 from collections import Counter, deque
 from itertools import chain
 from multiprocessing import Pool
-import sys, time
+import sys, time, os
 import random
 import gc
 import copy
@@ -19,6 +19,8 @@ import cPickle as pickle
 import shelve
 import math
 import resource
+import ntpath
+import redis
 
 """ global variables """
 # LSH
@@ -237,13 +239,14 @@ def logprint(log_file, flush, *output):
 	#	 log_output += str(element) + " "
 	log_output = " ".join(map(str, output))
 	print log_output
-	log_output += "\n"
-	log_file.write(log_output)
-	if flush:
-		log_file.flush()
+	if log_file:
+		log_output += "\n"
+		log_file.write(log_output)
+		if flush:
+			log_file.flush()
 
 
-def exportCandidatePairs(candidatePairs, output_file, log):
+def exportCandidatePairs(candidatePairs, output_file, log, numReads=None):
 	"""
 	Export candidate pairs to a file.
 	The type of file is determined on the provided filename for output_file.
@@ -288,7 +291,18 @@ def exportCandidatePairs(candidatePairs, output_file, log):
 				for id2 in sortedElements[:-1]:
 					f.write(str(id2)+",")
 				f.write(str(sortedElements[-1])+"\n")
-
+	elif ext == "temp":
+		with open(output_file, "w") as f:
+			for id1 in xrange(numReads):
+				f.write(str(id1)+"\t")
+				#sortedElements = sorted(list(candidatePairs[id1]))
+				#print sortedElements
+				if id1 in candidatePairs:
+					sortedElements = list(candidatePairs[id1])
+					for id2 in sortedElements[:-1]:
+						f.write(str(id2)+",")
+					f.write(str(sortedElements[-1]))
+				f.write("\n")
 	elif ext == "txt2":
 		with open(output_file, "w") as f:
 			for id1 in candidatePairs:
@@ -668,14 +682,45 @@ def getPrime(offset):
 # ************************************************************************** #
 def doWork(tup):
 	normal, diseased, shingles, k, rows, minhash_alg, b, bands, p = tup
+	r = redis.StrictRedis()
 	buckets = dict()
-	minhashing(normal, diseased, shingles, buckets, k, rows,
+	candidatePairs = dict()
+	num = minhashing(normal, diseased, shingles, buckets, k, rows,
 			   minhash_alg, b, bands, p, None)
-	#lshBand(buckets, b, candidatePairs, log)
-	print len(buckets)
+	lshBand(buckets, b, candidatePairs, None)
+	# for key in candidatePairs:
+	# 	print key, candidatePairs[key]
+	numPairs = 0
+	for key in candidatePairs:
+		r.rpush(key, candidatePairs[key])
+		numPairs += len(candidatePairs[key])
+		#val = ','.join(map(str, candidatePairs[key]))
+		#r.sadd(key,candidatePairs[key])
+	
+	# lst = [i for i in xrange(1000)]
+	# for i in xrange(100):
+	# 	r.rpush(i, lst)
+	print "Num buckets", len(buckets)
+	
+	# Obtain filenames
+	# filename = ntpath.basename(normal).rsplit(".", 1)[0]
+	# folder = filename+"_k_"+str(k)+"_b_"+str(bands)+"_r_"+str(rows)+\
+	# 		 "_m_"+str(minhash_alg)+"/"
+	# prefix = "lshOutput/"+folder+"b_"
+	# suffix = "_"+filename+"_k_"+str(k)+"_r_"+str(rows)+\
+	# 		 "_m_"+str(minhash_alg)+".temp"
+	# filename = prefix+str(b)+suffix
+	# os.system("mkdir lshOutput")
+	# os.system("mkdir lshOutput/"+folder)
+	
+	#exportCandidatePairs(candidatePairs, filename, None, num)
+	#multiSeqAlign(normal, diseased, b, bands, prefix, suffix, num)
+		
+		 
+	return numPairs
 
 
-def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log):
+def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multiProcessing, pool):
 	"""
 	Minhash algorithms:
 		pre-computed hash functions:
@@ -687,7 +732,6 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log):
 			5. Through whole matrix (according to the book)
 			6. Through all documents shingles
 	"""
-	multiProcessing = True
 	# Check if files are provided
 	if normal or diseased:
 		tim = time.clock()
@@ -721,7 +765,7 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log):
 				minhashing(normal, diseased, shingles, buckets, k, rows,
 						   minhash_alg, b, bands, p, log)
 				print len(buckets)
-				#lshBand(buckets, b, candidatePairs, log)
+				lshBand(buckets, b, candidatePairs, log)
 			
 				# Stop if memory limit reached
 				# limit = memory_usage_resource()
@@ -735,12 +779,11 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log):
 				#		  pass
 				#	  candidatePairs[idx].add(data)
 				#	  candDisk[idx] = candidatePairs[idx]
-		
 		if multiProcessing:
-			pool = Pool(processes=bands)
-			paras = [(normal, diseased, shingles, k, rows,
+			params = [(normal, diseased, shingles, k, rows,
 				   minhash_alg, b, bands, p) for b in range(bands)]
-			results = pool.map(doWork, paras)
+			results = pool.map(doWork, params)
+			print "numPairs:", sum(results)
 
 
 		logprint(log, False, "\nNumber of unique candidate pairs",
@@ -785,20 +828,24 @@ def toBase10(seq):
 	#digits = []
 	n = 0
 	for s in seq:
-		if s == "A": i = 0
-		elif s == "C": i = 1
-		elif s == "G": i = 2
-		elif s == "T": i = 3
+		if s == "A": 
+			i = 0
+		elif s == "C":
+			i = 1
+		elif s == "G":
+			i = 2
+		elif s == "T":
+			i = 3
 		n = 4 * n + i
 	return n
 
 
-def simpleHash(seq, numShingles):
-	n = 0
-	for s in seq:
-		n += ord(s)
-	n = n % numShingles
-	return n
+# def simpleHash(seq, numShingles):
+# 	n = 0
+# 	for s in seq:
+# 		n += ord(s)
+# 	n = n % numShingles
+# 	return n
 
 
 def minhashing(normal, diseased, shingles, buckets, k, rows, minhash_alg, bn, bs, p, log):
@@ -819,13 +866,17 @@ def minhashing(normal, diseased, shingles, buckets, k, rows, minhash_alg, bn, bs
 		hashfuncs = computeHashFunctions(rows, shingles, log)
 	else:
 		if minhash_alg == 7:
-			numShingles = 4**k
+			n = 4**k
 		else:
-			numShingles = len(shingles)
-		a = [random.randrange(1, numShingles) for i in xrange(rows)]
-		b = [random.randrange(numShingles) for i in xrange(rows)]
+			n = len(shingles)
+		a = [random.randrange(1, n) for i in xrange(rows)]
+		b = [random.randrange(n) for i in xrange(rows)]
 	for part in getPartsFromFile(normal, log):
-		if minhash_alg == 1:
+		if minhash_alg == 6:  # Default minhash alg 6
+			minhashing_alg6(part, idx, shingles, buckets, k, rows, p, a, b, n)
+		elif minhash_alg == 7:
+			minhashing_alg7(part, idx, shingles, buckets, k, rows, p, a, b, n)
+		elif minhash_alg == 1:
 			minhashing_alg1(part, idx, shingles, buckets, k, rows, hashfuncs)
 		elif minhash_alg == 2:
 			minhashing_alg2(part, idx, shingles, buckets, k, rows, hashfuncs)
@@ -835,23 +886,24 @@ def minhashing(normal, diseased, shingles, buckets, k, rows, minhash_alg, bn, bs
 			minhashing_alg4(part, idx, shingles, buckets, k, rows, p, a, b)
 		elif minhash_alg == 5:
 			minhashing_alg5(part, idx, shingles, buckets, k, rows, p, a, b)
-		elif minhash_alg == 7:
-			minhashing_alg7(part, idx, shingles, buckets, k, rows, p, a, b, numShingles)
-		else:  # Default to minhash alg 6
-			minhashing_alg6(part, idx, shingles, buckets, k, rows, p, a, b, numShingles)
+
 		idx += 1
 
-		# if idx % printMinhashProcess == 0:
-		# 	logprint(log, True, "Band", bn+1, "of", str(bs)+":",
-		# 			 "Processed", idx, "documents in",
-		# 			 (time.clock() - tim) / 60, "minutes")
+		if idx % printMinhashProcess == 0:
+			logprint(log, True, "Band", bn+1, "of", str(bs)+":",
+					 "Processed", idx, "documents in",
+					 (time.clock() - tim) / 60, "minutes")
 
 	global secondSample
 	if secondSample == 0:
 		secondSample = idx
 
 	for part in getPartsFromFile(diseased, log):
-		if minhash_alg == 1:
+		if minhash_alg == 6:  # Default minhash alg 6
+			minhashing_alg6(part, idx, shingles, buckets, k, rows, p, a, b, n)
+		elif minhash_alg == 7:
+			minhashing_alg7(part, idx, shingles, buckets, k, rows, p, a, b, n)
+		elif minhash_alg == 1:
 			minhashing_alg1(part, idx, shingles, buckets, k, rows, hashfuncs)
 		elif minhash_alg == 2:
 			minhashing_alg2(part, idx, shingles, buckets, k, rows, hashfuncs)
@@ -861,21 +913,17 @@ def minhashing(normal, diseased, shingles, buckets, k, rows, minhash_alg, bn, bs
 			minhashing_alg4(part, idx, shingles, buckets, k, rows, p, a, b)
 		elif minhash_alg == 5:
 			minhashing_alg5(part, idx, shingles, buckets, k, rows, p, a, b)
-		elif minhash_alg == 7:
-			minhashing_alg7(part, idx, shingles, buckets, k, rows, p, a, b, numShingles)
-		else:  # Default to minhash alg 6
-			minhashing_alg6(part, idx, shingles, buckets, k, rows, p, a, b, numShingles)
 
 		idx += 1
 
-	# 	if idx % printMinhashProcess == 0:
-	# 		logprint(log, True, "Band", bn+1, "of", str(bs)+":",
-	# 				 "Processed", idx, "documents in",
-	# 				 (time.clock() - tim) / 60, "minutes")
-	#
-	# logprint(log, False, "Finished minhashing in",
-	# 		 (time.clock() - tim) / 60, "minutes")
-	# logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
+		if idx % printMinhashProcess == 0:
+			logprint(log, True, "Band", bn+1, "of", str(bs)+":",
+					 "Processed", idx, "documents in",
+					 (time.clock() - tim) / 60, "minutes")
+
+	logprint(log, False, "Finished minhashing in",
+			 (time.clock() - tim) / 60, "minutes")
+	logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
 	return idx
 
 
@@ -891,25 +939,41 @@ def lshBand(buckets, b, candidatePairs, log):
 				id2 = buckets[bucket][j]
 				if id1 % 2 == 0 and id2 % 2 == 1:
 					if id1 + 1 != id2:
+						# if id1 in candidatePairs:
+						# 	candidatePairs[id1].add(id2)
+						# else:
+						# 	candidatePairs[id1] = set([id2])
+						# if id2 in candidatePairs:
+						# 	candidatePairs[id2].add(id1)
+						# else:
+						# 	candidatePairs[id2] = set([id1])
 						if id1 in candidatePairs:
-							candidatePairs[id1].add(id2)
+							candidatePairs[id1].append(id2)
 						else:
-							candidatePairs[id1] = set([id2])
+							candidatePairs[id1] = [id2]
 						if id2 in candidatePairs:
-							candidatePairs[id2].add(id1)
+							candidatePairs[id2].append(id1)
 						else:
-							candidatePairs[id2] = set([id1])
+							candidatePairs[id2] = [id1]
 						numPairsUnique += 1
-				if id1 % 2 == 1 and id2 % 2 == 0:
+				elif id1 % 2 == 1 and id2 % 2 == 0:
 					if id1 - 1 != id2:
+						# if id1 in candidatePairs:
+						# 	candidatePairs[id1].add(id2)
+						# else:
+						# 	candidatePairs[id1] = set([id2])
+						# if id2 in candidatePairs:
+						# 	candidatePairs[id2].add(id1)
+						# else:
+						# 	candidatePairs[id2] = set([id1])
 						if id1 in candidatePairs:
-							candidatePairs[id1].add(id2)
+							candidatePairs[id1].append(id2)
 						else:
-							candidatePairs[id1] = set([id2])
+							candidatePairs[id1] = [id2]
 						if id2 in candidatePairs:
-							candidatePairs[id2].add(id1)
+							candidatePairs[id2].append(id1)
 						else:
-							candidatePairs[id2] = set([id1])
+							candidatePairs[id2] = [id1]
 						numPairsUnique += 1
 
 	logprint(log, True, "Number of buckets in band", str(b)+":", len(buckets))
@@ -1097,7 +1161,7 @@ def minhashing_alg6(dna, idx, shingles, buckets, k, rows, p, a, b, n):
 			if val < minVal:
 				minVal = val
 		signature.append(minVal)
-	#print signature
+	# print signature
 
 	key = ','.join(map(str, signature))
 	if key in buckets:
@@ -1917,6 +1981,15 @@ def print_alignedGroups(groups, read_R, seqs, log):
 			logprint(log, True, "Number of left parts:", len(leftParts))
 
 
+def getMates(read, r):
+	for mates in r.lrange(read,0,-1):
+		mates = eval(mates)
+		if len(mates) > maxCandMates:
+			continue
+		for mate in mates:
+			yield mate
+
+
 def sequenceAlignment(candidatePairs, normal, diseased, log):
 	seqsNormal = getAllReads(normal, log)
 	global secondSample
@@ -2000,9 +2073,95 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
 	logprint(log, False, "counterRightGroups:\n", Counter(numRightPartGroups))
 
 
-def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log):
+def multiSeqAlign(tup):
+	seqs, p, pool_size, num, log = tup
+	log = None
+	numMutations1 = 0
+	numMutations2 = 0
+	numParts = ((num+1) / 2) / pool_size
+	prog = 0
+	tim = time.clock()
+	r = redis.StrictRedis()
+	for read_R in xrange(p, secondSample+10, pool_size):
+
+		alignedGroups = []
+		
+		# Align left parts
+		alignLeftParts(read_R, seqs, alignedGroups, None, log, r)
+
+		# Align right parts
+		alignRightParts(read_R, seqs, alignedGroups, None, log, r)
+
+		# Analyze the aligned group to find mutations
+		if MUTFIND == 1:
+			numMutations1 += oldFindMutation(read_R, seqs,
+											 alignedGroups, None)
+		else:
+			numMutations2 += newFindMutation(read_R, seqs,
+											 alignedGroups, log)
+		
+
+		#print_alignedGroups(alignedGroups, read_R, seqs, log)
+		# sys.exit()
+		prog += 1
+		if prog % 500 == 0:
+			logprint(log, False, "Processed", prog, "of", numParts,
+					 "anchor points in", (time.clock()-tim)/60, "minutes")
+			logprint(log, True, "Memory usage (in mb):",
+					 memory_usage_resource())
+			global c1
+			logprint(log, False, "left parts aligned:", c1)
+			#c1 = 0
+			global c2
+			logprint(log, True, "right parts aligned:", c2)
+			logprint(log, True, "num useful groups:", numMutations1)
+			logprint(log, True, "num useful groups:", numMutations2)
+			global c3
+			logprint(log, False, "positions compared:", c3)
+			#c2 = 0
+
+	logprint(log, False, "Finished sequence alignment",
+			 (time.clock() - tim) / 60, "minutes")
+	logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
+	logprint(log, False, "c1:", c1)
+	logprint(log, False, "c2:", c2)
+	logprint(log, False, "c3:", c3)
+	logprint(log, False, "c4:", c4)
+	logprint(log, False, "c5:", c5)
+	logprint(log, False, "c6:", c6)
+	logprint(log, False, "c7:", c7)
+	logprint(log, False, "Too small groups:", c8)
+	logprint(log, False, "numReadL:", numreadL)
+	logprint(log, False, "numReadR:", numreadR)
+	logprint(log, False, "numMutations1:", numMutations1)
+	logprint(log, False, "numMutations2:", numMutations2)
+	#logprint(log, False, "counterAlignGroups:\n", Counter(numAlignedGroups))
+	#logprint(log, False, "counterRightGroups:\n", Counter(numRightPartGroups))
+
+
+def initMultiSeqAlign(normal, diseased, pool, pool_size, log=None):
+	seqsNormal = getAllReads(normal, log)
+	global secondSample
+	secondSample = len(seqsNormal)
+	seqsDiseased = getAllReads(diseased, log)
+	seqs = seqsNormal + seqsDiseased
+	num = len(seqs)
+	print pool_size
+	
+	params = [(seqs, p, pool_size, num, log) for p in range(pool_size)]
+	results = pool.map(multiSeqAlign, params)
+
+
+def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log, r=None):
 	readROffset = len(seqs[read_R-1])
-	for read_L in candidatePairs[read_R]:
+	checkedLeftParts = set()
+	if r:
+		parts = getMates(read_R, r)
+	else:
+		parts = candidatePairs[read_R]
+	for read_L in parts:
+		if read_L in checkedLeftParts:
+			continue
 		if read_L < secondSample:
 			m = M1  # set to 0 or M1
 		else:
@@ -2073,7 +2232,8 @@ def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log):
 
 				# Append new group to the other groups
 				alignedGroups.append(group)
-
+			
+			checkedLeftParts.add(read_L)
 	# TESTING - Second pass of left-parts
 	# for i in xrange(len(alignedGroups)):
 	#	  for read_L in alignedGroups[i].leftPartsN:
@@ -2771,7 +2931,7 @@ def testRead(group, seqs, read_R, next_read_R, offset, m2, alignments, log):
 	return alignments + 1
 
 
-def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
+def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log, r=None):
 	startOnePosOverlap = True
 	for group in alignedGroups:
 		group.checkedRightParts.add(read_R)
@@ -2782,9 +2942,13 @@ def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
 		# 	c8 += 1
 		# 	continue
 		for read_L in (group.leftPartsN.keys()+group.leftPartsD.keys()):
-			if len(candidatePairs[read_L]) > maxCandMates:
-				continue
-			for next_read_R in candidatePairs[read_L]:
+			if r:
+				parts = getMates(read_L, r)
+			else:
+				if len(candidatePairs[read_L]) > maxCandMates:
+					continue
+				parts = candidatePairs[read_L]
+			for next_read_R in parts:
 				if next_read_R not in group.checkedRightParts:
 					if startOnePosOverlap:
 						# m = M2
@@ -3281,7 +3445,7 @@ def main():
 	# input_file = "candidate_pairs_k_16_b_2_r_5_m_6.txt"
 
 	# n (number of hash functions = length of minhash signature) is given by
-	n = bands * rows
+	# n = bands * rows
 
 	with open(log_file, 'w') as log:
 
@@ -3290,8 +3454,30 @@ def main():
 		else:
 			# candidatePairs = runLSH(fasta_file, bands, rows, n, k, seed,
 			#						  minhash_alg, log)
-			candidatePairs = runLSH(normal_file, diseased_file, bands, rows,
-									k, seed, minhash_alg, test, log)
+			multiProcessing = True
+			if multiProcessing:
+				r = redis.StrictRedis()
+				r.flushdb()
+				p_size = bands
+				pool = Pool(processes=p_size)
+				print 
+				candidatePairs = runLSH(normal_file, diseased_file, bands,
+					 				rows, k, seed, minhash_alg, test, log,
+									multiProcessing, pool)
+				# for i in xrange(20):
+				# 	print i, r.lrange(i,0,-1)
+				# 	for mates in r.lrange(i,0,-1):
+				# 		for mate in eval(mates):
+				# 			print mate
+				
+				initMultiSeqAlign(normal_file, diseased_file, pool, p_size,
+					 			  log)
+			
+			else:
+				candidatePairs = runLSH(normal_file, diseased_file, bands, 
+									rows, k, seed, minhash_alg, test, log,
+									multiProcessing, None)
+			
 		if output_file:
 			output = "candidate_pairs_k_"+str(k)+"_b_"+str(bands)+"_r_"+ \
 					 str(rows)+"_m_"+str(minhash_alg)
@@ -3320,7 +3506,6 @@ def main():
 			Test different k values
 			"""
 			if fasta_file:
-				import os
 				os.system("echo '"+str(k)+"\t"+str(candidatePairs[0])+"\t"+
 						  str(candidatePairs[1])+"\t"+
 						  str(candidatePairs[2])+"' >> "+fasta_file)
