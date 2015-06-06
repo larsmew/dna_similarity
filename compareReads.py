@@ -1983,10 +1983,13 @@ def print_alignedGroups(groups, read_R, seqs, log):
 
 def getMates(read, r):
 	for mates in r.lrange(read,0,-1):
+		print "hej1"
 		mates = eval(mates)
+		print "hej2"
 		if len(mates) > maxCandMates:
 			continue
 		for mate in mates:
+			print "hej3"
 			yield mate
 
 
@@ -2082,7 +2085,7 @@ def multiSeqAlign(tup):
 	prog = 0
 	tim = time.clock()
 	r = redis.StrictRedis()
-	for read_R in xrange(p, secondSample+10, pool_size):
+	for read_R in xrange(p, secondSample+1, pool_size):
 
 		alignedGroups = []
 		
