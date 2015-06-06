@@ -1983,13 +1983,13 @@ def print_alignedGroups(groups, read_R, seqs, log):
 
 def getMates(read, r):
 	for mates in r.lrange(read,0,-1):
-		print "hej1"
+		#print "hej1"
 		mates = eval(mates)
-		print "hej2"
+		#print "hej2"
 		if len(mates) > maxCandMates:
 			continue
 		for mate in mates:
-			print "hej3"
+			#print "hej3"
 			yield mate
 
 
@@ -2009,6 +2009,8 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
 	prog = 0
 	tim = time.clock()
 	for read_R in candidatePairs:
+	#for read_R in xrange(1, len(seqs)+1, 20):
+		#print read_R
 		if read_R < secondSample and read_R % 2 == 1:
 		# if read_R % 2 == 1:
 		# if read_R == 42535:
@@ -2085,7 +2087,8 @@ def multiSeqAlign(tup):
 	prog = 0
 	tim = time.clock()
 	r = redis.StrictRedis()
-	for read_R in xrange(p, secondSample+1, pool_size):
+	for read_R in xrange(p*2+1, secondSample+1, pool_size*2):
+		#print read_R
 
 		alignedGroups = []
 		
@@ -2149,10 +2152,11 @@ def initMultiSeqAlign(normal, diseased, pool, pool_size, log=None):
 	seqsDiseased = getAllReads(diseased, log)
 	seqs = seqsNormal + seqsDiseased
 	num = len(seqs)
-	print pool_size
 	
-	params = [(seqs, p, pool_size, num, log) for p in range(pool_size)]
+	params = [(seqs, p, pool_size, num, log) for p in range(0, pool_size)]
+	#params = (seqs, 0, pool_size, num, log)
 	results = pool.map(multiSeqAlign, params)
+	#multiSeqAlign(params)
 
 
 def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log, r=None):
@@ -3457,13 +3461,13 @@ def main():
 		else:
 			# candidatePairs = runLSH(fasta_file, bands, rows, n, k, seed,
 			#						  minhash_alg, log)
-			multiProcessing = True
+			multiProcessing = False
 			if multiProcessing:
 				r = redis.StrictRedis()
 				r.flushdb()
-				p_size = bands
+				p_size = 20 # bands
 				pool = Pool(processes=p_size)
-				print 
+				#pool = None
 				candidatePairs = runLSH(normal_file, diseased_file, bands,
 					 				rows, k, seed, minhash_alg, test, log,
 									multiProcessing, pool)
