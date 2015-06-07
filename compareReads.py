@@ -27,6 +27,7 @@ import redis
 leftPartRatio = 0.5
 rightPartRatio = 0.5
 printMinhashProcess = 500000
+setVersion = True
 
 # Sequence Alignment
 M1 = 1
@@ -682,21 +683,21 @@ def getPrime(offset):
 # ************************************************************************** #
 def doWork(tup):
 	normal, diseased, shingles, k, rows, minhash_alg, b, bands, p = tup
-	#r = redis.StrictRedis()
+	r = redis.StrictRedis()
 	buckets = dict()
 	candidatePairs = dict()
 	num = minhashing(normal, diseased, shingles, buckets, k, rows,
 			   minhash_alg, b, bands, p, None)
-	lshBand(buckets, b, candidatePairs, None)
+	numPairs = lshBandRedis(buckets, b, candidatePairs, None, r)
 	# for key in candidatePairs:
 	# 	print key, candidatePairs[key]
-	numPairs = 0
-	for key in candidatePairs:
+	#numPairs = 0
+	#for key in candidatePairs:
 		#r.rpush(key, candidatePairs[key])
-		pre = "redis-cli SADD "+str(key)+" "
-		cmd = pre+" ".join(map(str,candidatePairs[key]))
-		os.system(cmd+" > /dev/null")
-		numPairs += len(candidatePairs[key])
+		#pre = "redis-cli SADD "+str(key)+" "
+		#cmd = pre+" ".join(map(str,candidatePairs[key]))
+		#os.system(cmd+" > /dev/null")
+		#numPairs += len(candidatePairs[key])
 		#val = ','.join(map(str, candidatePairs[key]))
 		#r.sadd(key,candidatePairs[key])
 	
@@ -786,11 +787,11 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 			params = [(normal, diseased, shingles, k, rows,
 				   minhash_alg, b, bands, p) for b in range(bands)]
 			results = pool.map(doWork, params)
-			print "numPairs:", sum(results)
+			logprint(log, False, "Number of candidate pairs:", sum(results))
+			
 
-
-		logprint(log, False, "\nNumber of unique candidate pairs",
-				 sum(len(candidatePairs[i]) for i in candidatePairs)/2)
+		#logprint(log, False, "\nNumber of unique candidate pairs",
+				 #sum(len(candidatePairs[i]) for i in candidatePairs)/2)
 		logprint(log, False, "Finished LSH in",
 				 (time.clock() - tim) / 60, "minutes")
 		logprint(log, True, "Memory usage (in mb):", memory_usage_resource(),
@@ -942,41 +943,41 @@ def lshBand(buckets, b, candidatePairs, log):
 				id2 = buckets[bucket][j]
 				if id1 % 2 == 0 and id2 % 2 == 1:
 					if id1 + 1 != id2:
-						# if id1 in candidatePairs:
-						# 	candidatePairs[id1].add(id2)
-						# else:
-						# 	candidatePairs[id1] = set([id2])
-						# if id2 in candidatePairs:
-						# 	candidatePairs[id2].add(id1)
-						# else:
-						# 	candidatePairs[id2] = set([id1])
 						if id1 in candidatePairs:
-							candidatePairs[id1].append(id2)
+							candidatePairs[id1].add(id2)
 						else:
-							candidatePairs[id1] = [id2]
+							candidatePairs[id1] = set([id2])
 						if id2 in candidatePairs:
-							candidatePairs[id2].append(id1)
+							candidatePairs[id2].add(id1)
 						else:
-							candidatePairs[id2] = [id1]
+							candidatePairs[id2] = set([id1])
+						# if id1 in candidatePairs:
+						# 	candidatePairs[id1].append(id2)
+						# else:
+						# 	candidatePairs[id1] = [id2]
+						# if id2 in candidatePairs:
+						# 	candidatePairs[id2].append(id1)
+						# else:
+						# 	candidatePairs[id2] = [id1]
 						numPairsUnique += 1
 				elif id1 % 2 == 1 and id2 % 2 == 0:
 					if id1 - 1 != id2:
-						# if id1 in candidatePairs:
-						# 	candidatePairs[id1].add(id2)
-						# else:
-						# 	candidatePairs[id1] = set([id2])
-						# if id2 in candidatePairs:
-						# 	candidatePairs[id2].add(id1)
-						# else:
-						# 	candidatePairs[id2] = set([id1])
 						if id1 in candidatePairs:
-							candidatePairs[id1].append(id2)
+							candidatePairs[id1].add(id2)
 						else:
-							candidatePairs[id1] = [id2]
+							candidatePairs[id1] = set([id2])
 						if id2 in candidatePairs:
-							candidatePairs[id2].append(id1)
+							candidatePairs[id2].add(id1)
 						else:
-							candidatePairs[id2] = [id1]
+							candidatePairs[id2] = set([id1])
+						# if id1 in candidatePairs:
+						# 	candidatePairs[id1].append(id2)
+						# else:
+						# 	candidatePairs[id1] = [id2]
+						# if id2 in candidatePairs:
+						# 	candidatePairs[id2].append(id1)
+						# else:
+						# 	candidatePairs[id2] = [id1]
 						numPairsUnique += 1
 
 	logprint(log, True, "Number of buckets in band", str(b)+":", len(buckets))
@@ -995,6 +996,63 @@ def lshBand(buckets, b, candidatePairs, log):
 	# print len(candidatePairs)
 
 	return None
+
+
+def lshBandRedis(buckets, b, candidatePairs, log, r=None):
+	tim = time.clock()
+	logprint(log, True, "Running LSH and finding similar pairs...")
+	numPairsUnique = 0
+	b += 1
+	
+	# SET VERSION
+	if setVersion:
+		pipe = r.pipeline()
+		for bucket in buckets:
+			for i in xrange(len(buckets[bucket])):
+				id1 = buckets[bucket][i]
+				for j in xrange(i+1, len(buckets[bucket])):
+					id2 = buckets[bucket][j]
+					if id1 % 2 == 0 and id2 % 2 == 1:
+						if id1 + 1 != id2:
+							pipe.sadd(id1,id2)
+							pipe.sadd(id2,id1)
+							numPairsUnique += 1
+					elif id1 % 2 == 1 and id2 % 2 == 0:
+						if id1 - 1 != id2:
+							pipe.sadd(id1,id2)
+							pipe.sadd(id2,id1)
+							numPairsUnique += 1
+			pipe.execute()
+
+	# LIST VERSION
+	else:
+		pipe = r.pipeline()
+		for bucket in buckets:
+			leftParts = []
+			rightParts = []
+			for item in buckets[bucket]:
+				if item % 2 == 0:
+					leftParts.append(item)
+				else:
+					rightParts.append(item)
+			numPairsUnique += len(leftParts)*len(rightParts)
+			for key in leftParts:
+				pipe.rpush(key, rightParts)
+			for key in rightParts:
+				pipe.rpush(key, leftParts)
+			pipe.execute()
+		
+
+	logprint(log, True, "Number of buckets in band", str(b)+":", len(buckets))
+	logprint(log, True, "Number of unique candidate pairs in band",
+			 str(b)+":", numPairsUnique)
+
+	# print "Finished LSH for band", b, "in", (time.clock() - tim) / 60, \
+	#		"minutes"
+
+	# print len(candidatePairs)
+
+	return numPairsUnique
 
 
 # ************************************************************************** #
@@ -1985,16 +2043,16 @@ def print_alignedGroups(groups, read_R, seqs, log):
 
 
 def getMates(read, r):
-	# for mates in r.lrange(read,0,-1):
-	# 	mates = eval(mates)
-	# 	#print "hej2"
-	# 	if len(mates) > maxCandMates:
-	# 		continue
-	# 	for mate in mates:
-	# 		#print "hej3"
-	# 		yield mate
-	for mate in r.smembers(read):
-		yield int(mate)
+	if setVersion:
+		for mate in r.smembers(read):
+			yield int(mate)
+	else:
+		for mates in r.lrange(read,0,-1):
+			mates = eval(mates)
+			if len(mates) > maxCandMates:
+				continue
+			for mate in mates:
+				yield mate
 
 
 def sequenceAlignment(candidatePairs, normal, diseased, log):
@@ -2165,14 +2223,14 @@ def initMultiSeqAlign(normal, diseased, pool, pool_size, log=None):
 
 def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log, r=None):
 	readROffset = len(seqs[read_R-1])
-	#checkedLeftParts = set()
+	checkedLeftParts = set()
 	if r:
 		parts = getMates(read_R, r)
 	else:
 		parts = candidatePairs[read_R]
 	for read_L in parts:
-		# if read_L in checkedLeftParts:
-		# 	continue
+		if read_L in checkedLeftParts:
+			continue
 		if read_L < secondSample:
 			m = M1  # set to 0 or M1
 		else:
@@ -2244,7 +2302,7 @@ def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log, r=None):
 				# Append new group to the other groups
 				alignedGroups.append(group)
 			
-			#checkedLeftParts.add(read_L)
+			checkedLeftParts.add(read_L)
 	# TESTING - Second pass of left-parts
 	# for i in xrange(len(alignedGroups)):
 	#	  for read_L in alignedGroups[i].leftPartsN:
