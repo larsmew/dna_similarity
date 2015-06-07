@@ -682,7 +682,7 @@ def getPrime(offset):
 # ************************************************************************** #
 def doWork(tup):
 	normal, diseased, shingles, k, rows, minhash_alg, b, bands, p = tup
-	r = redis.StrictRedis()
+	#r = redis.StrictRedis()
 	buckets = dict()
 	candidatePairs = dict()
 	num = minhashing(normal, diseased, shingles, buckets, k, rows,
@@ -692,7 +692,10 @@ def doWork(tup):
 	# 	print key, candidatePairs[key]
 	numPairs = 0
 	for key in candidatePairs:
-		r.rpush(key, candidatePairs[key])
+		#r.rpush(key, candidatePairs[key])
+		pre = "redis-cli SADD "+str(key)+" "
+		cmd = pre+" ".join(map(str,candidatePairs[key]))
+		os.system(cmd+" > /dev/null")
 		numPairs += len(candidatePairs[key])
 		#val = ','.join(map(str, candidatePairs[key]))
 		#r.sadd(key,candidatePairs[key])
@@ -1982,15 +1985,16 @@ def print_alignedGroups(groups, read_R, seqs, log):
 
 
 def getMates(read, r):
-	for mates in r.lrange(read,0,-1):
-		#print "hej1"
-		mates = eval(mates)
-		#print "hej2"
-		if len(mates) > maxCandMates:
-			continue
-		for mate in mates:
-			#print "hej3"
-			yield mate
+	# for mates in r.lrange(read,0,-1):
+	# 	mates = eval(mates)
+	# 	#print "hej2"
+	# 	if len(mates) > maxCandMates:
+	# 		continue
+	# 	for mate in mates:
+	# 		#print "hej3"
+	# 		yield mate
+	for mate in r.smembers(read):
+		yield int(mate)
 
 
 def sequenceAlignment(candidatePairs, normal, diseased, log):
@@ -2161,14 +2165,14 @@ def initMultiSeqAlign(normal, diseased, pool, pool_size, log=None):
 
 def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log, r=None):
 	readROffset = len(seqs[read_R-1])
-	checkedLeftParts = set()
+	#checkedLeftParts = set()
 	if r:
 		parts = getMates(read_R, r)
 	else:
 		parts = candidatePairs[read_R]
 	for read_L in parts:
-		if read_L in checkedLeftParts:
-			continue
+		# if read_L in checkedLeftParts:
+		# 	continue
 		if read_L < secondSample:
 			m = M1  # set to 0 or M1
 		else:
@@ -2240,7 +2244,7 @@ def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log, r=None):
 				# Append new group to the other groups
 				alignedGroups.append(group)
 			
-			checkedLeftParts.add(read_L)
+			#checkedLeftParts.add(read_L)
 	# TESTING - Second pass of left-parts
 	# for i in xrange(len(alignedGroups)):
 	#	  for read_L in alignedGroups[i].leftPartsN:
