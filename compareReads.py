@@ -27,7 +27,7 @@ import redis
 leftPartRatio = 0.5
 rightPartRatio = 0.5
 printMinhashProcess = 500000
-setVersion = True
+setVersion = False
 
 # Sequence Alignment
 M1 = 1
@@ -683,14 +683,14 @@ def getPrime(offset):
 # ************************************************************************** #
 def doWork(tup):
 	normal, diseased, shingles, k, rows, minhash_alg, b, bands, p = tup
-	r = redis.StrictRedis()
+	#r = redis.StrictRedis()
 	buckets = dict()
-	candidatePairs = dict()
+	#candidatePairs = dict()
 	num = minhashing(normal, diseased, shingles, buckets, k, rows,
 			   minhash_alg, b, bands, p, None)
-	numPairs = lshBandRedis(buckets, b, candidatePairs, None, r)
-	# for key in candidatePairs:
-	# 	print key, candidatePairs[key]
+	numPairs = lshBandRedis(buckets, b, None, None, None)
+	# for key, parts in lshBandRedis(buckets, b, candidatePairs, None, r):
+
 	#numPairs = 0
 	#for key in candidatePairs:
 		#r.rpush(key, candidatePairs[key])
@@ -719,8 +719,7 @@ def doWork(tup):
 	
 	#exportCandidatePairs(candidatePairs, filename, None, num)
 	#multiSeqAlign(normal, diseased, b, bands, prefix, suffix, num)
-		
-		 
+	
 	return numPairs
 
 
@@ -786,8 +785,32 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 		if multiProcessing:
 			params = [(normal, diseased, shingles, k, rows,
 				   minhash_alg, b, bands, p) for b in range(bands)]
-			results = pool.map(doWork, params)
-			logprint(log, False, "Number of candidate pairs:", sum(results))
+			#results = pool.map(doWork, params)
+			# pipe = r.pipeline()
+			result = pool.map(doWork, params)
+			logprint(log, False, "Number of candidate pairs:", sum(result))
+			tim = time.clock()
+			logprint(log, False, "Combining shelves...")
+			d = shelve.open("shelveDBs/cache0")
+			shelvesList = [shelve.open("shelveDBs/cache"+str(b), "r") for b
+				 		   in xrange(1,bands)]
+			for i in d.keys():
+				finalSet = set(d[str(i)])
+				#for b in xrange(1, bands):
+					#d_temp = shelve.open("shelveDBs/cache"+str(b), "r")
+				for d_temp in shelvesList:
+					lst_temp = d_temp[i]
+					#d_temp.close()
+					for item in lst_temp:
+						finalSet.add(item)
+				d[str(i)] = list(finalSet)
+			
+			# for key in d.keys():
+			# 	print key, d[key]
+			for d_temp in shelvesList:
+				d_temp.close()
+			d.close()
+				
 			
 
 		#logprint(log, False, "\nNumber of unique candidate pairs",
@@ -842,14 +865,6 @@ def toBase10(seq):
 			i = 3
 		n = 4 * n + i
 	return n
-
-
-# def simpleHash(seq, numShingles):
-# 	n = 0
-# 	for s in seq:
-# 		n += ord(s)
-# 	n = n % numShingles
-# 	return n
 
 
 def minhashing(normal, diseased, shingles, buckets, k, rows, minhash_alg, bn, bs, p, log):
@@ -1002,6 +1017,7 @@ def lshBandRedis(buckets, b, candidatePairs, log, r=None):
 	tim = time.clock()
 	logprint(log, True, "Running LSH and finding similar pairs...")
 	numPairsUnique = 0
+	d = shelve.open("shelveDBs/cache"+str(b), "c")
 	b += 1
 	
 	# SET VERSION
@@ -1026,7 +1042,9 @@ def lshBandRedis(buckets, b, candidatePairs, log, r=None):
 
 	# LIST VERSION
 	else:
-		pipe = r.pipeline()
+		if b == 2:
+			time.sleep(2)
+		#pipe = r.pipeline()
 		for bucket in buckets:
 			leftParts = []
 			rightParts = []
@@ -1037,11 +1055,19 @@ def lshBandRedis(buckets, b, candidatePairs, log, r=None):
 					rightParts.append(item)
 			numPairsUnique += len(leftParts)*len(rightParts)
 			for key in leftParts:
-				pipe.rpush(key, rightParts)
+				#pipe.rpush(key, rightParts)
+				#print key, rightParts
+				d[str(key)] = rightParts
 			for key in rightParts:
-				pipe.rpush(key, leftParts)
-			pipe.execute()
-		
+				#pipe.rpush(key, leftParts)
+				#print key, leftParts
+				d[str(key)] = leftParts
+			#pipe.execute()
+
+	# for key in d.keys():
+	# 	print key, d[key]
+	
+	d.close()
 
 	logprint(log, True, "Number of buckets in band", str(b)+":", len(buckets))
 	logprint(log, True, "Number of unique candidate pairs in band",
@@ -2045,14 +2071,21 @@ def print_alignedGroups(groups, read_R, seqs, log):
 def getMates(read, r):
 	if setVersion:
 		for mate in r.smembers(read):
-			yield int(mate)
+			return int(mate)
 	else:
-		for mates in r.lrange(read,0,-1):
-			mates = eval(mates)
-			if len(mates) > maxCandMates:
-				continue
-			for mate in mates:
-				yield mate
+		mates = r[str(read)]
+		if len(mates) > maxCandMates:
+		 	return []
+		else:
+			return mates
+		#for mates in r.lrange(read,0,-1):
+		# for mates in r[str(read)]:
+		# 	#mates = eval(mates)
+		# 	print mates
+		# 	if len(mates) > maxCandMates:
+		# 		continue
+		# 	for mate in mates:
+		# 		yield mate
 
 
 def sequenceAlignment(candidatePairs, normal, diseased, log):
@@ -2148,7 +2181,9 @@ def multiSeqAlign(tup):
 	numParts = ((num+1) / 2) / pool_size
 	prog = 0
 	tim = time.clock()
-	r = redis.StrictRedis()
+	#r = redis.StrictRedis()
+	r = shelve.open("shelveDBs/cache0", "r")
+	print r['1']
 	for read_R in xrange(p*2+1, secondSample+1, pool_size*2):
 		#print read_R
 
@@ -2163,7 +2198,7 @@ def multiSeqAlign(tup):
 		# Analyze the aligned group to find mutations
 		if MUTFIND == 1:
 			numMutations1 += oldFindMutation(read_R, seqs,
-											 alignedGroups, None)
+											 alignedGroups, log)
 		else:
 			numMutations2 += newFindMutation(read_R, seqs,
 											 alignedGroups, log)
@@ -2226,6 +2261,7 @@ def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log, r=None):
 	checkedLeftParts = set()
 	if r:
 		parts = getMates(read_R, r)
+		#parts = r[str(read_R)]
 	else:
 		parts = candidatePairs[read_R]
 	for read_L in parts:
@@ -3525,8 +3561,8 @@ def main():
 			#						  minhash_alg, log)
 			multiProcessing = True
 			if multiProcessing:
-				r = redis.StrictRedis()
-				r.flushdb()
+				# r = redis.StrictRedis()
+				# r.flushdb()
 				p_size = bands
 				pool = Pool(processes=p_size)
 				#pool = None
@@ -3539,8 +3575,7 @@ def main():
 				# 		for mate in eval(mates):
 				# 			print mate
 				
-				initMultiSeqAlign(normal_file, diseased_file, pool, p_size,
-					 			  log)
+				initMultiSeqAlign(normal_file,diseased_file,pool,p_size,log)
 			
 			else:
 				candidatePairs = runLSH(normal_file, diseased_file, bands, 
