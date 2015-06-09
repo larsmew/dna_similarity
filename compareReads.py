@@ -9,7 +9,7 @@ from optparse import OptionParser
 from operator import itemgetter
 from collections import Counter, deque
 from itertools import chain
-from multiprocessing import Pool
+from multiprocessing import Pool, Queue, Process
 import sys, time, os
 import random
 import gc
@@ -681,14 +681,15 @@ def getPrime(offset):
 #						  Locality Sensitive Hashing						 #
 #																			 #
 # ************************************************************************** #
-def doWork(tup):
-	normal, diseased, shingles, k, rows, minhash_alg, b, bands, p = tup
+def doWork(tup, b, q):
+	time.sleep(b)
+	normal, diseased, shingles, k, rows, minhash_alg, bands, p = tup
 	#r = redis.StrictRedis()
 	buckets = dict()
 	#candidatePairs = dict()
 	num = minhashing(normal, diseased, shingles, buckets, k, rows,
 			   minhash_alg, b, bands, p, None)
-	numPairs = lshBandRedis(buckets, b, None, None, None)
+	numPairs = lshBandRedis(buckets, b, None, None, q)
 	# for key, parts in lshBandRedis(buckets, b, candidatePairs, None, r):
 
 	#numPairs = 0
@@ -783,33 +784,59 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 				#	  candidatePairs[idx].add(data)
 				#	  candDisk[idx] = candidatePairs[idx]
 		if multiProcessing:
-			params = [(normal, diseased, shingles, k, rows,
-				   minhash_alg, b, bands, p) for b in range(bands)]
+			q = Queue()
+			# params = [(normal, diseased, shingles, k, rows,
+			# 	   minhash_alg, b, bands, p) for b in range(bands)]
+			params = (normal, diseased, shingles, k, rows, 
+					   minhash_alg, bands, p)
+			
+			for b in xrange(bands):
+				p = Process(target=doWork, args=(params, b, q, ))
+				p.start()
 			#results = pool.map(doWork, params)
 			# pipe = r.pipeline()
-			result = pool.map(doWork, params)
-			logprint(log, False, "Number of candidate pairs:", sum(result))
-			tim = time.clock()
-			logprint(log, False, "Combining shelves...")
-			d = shelve.open("shelveDBs/cache0")
-			shelvesList = [shelve.open("shelveDBs/cache"+str(b), "r") for b
-				 		   in xrange(1,bands)]
-			for i in d.keys():
-				finalSet = set(d[str(i)])
-				#for b in xrange(1, bands):
-					#d_temp = shelve.open("shelveDBs/cache"+str(b), "r")
-				for d_temp in shelvesList:
-					lst_temp = d_temp[i]
-					#d_temp.close()
-					for item in lst_temp:
-						finalSet.add(item)
-				d[str(i)] = list(finalSet)
 			
-			# for key in d.keys():
-			# 	print key, d[key]
-			for d_temp in shelvesList:
-				d_temp.close()
+			tim = time.clock()
+			logprint(log, False, "Combining shelve...")
+			d = shelve.open("shelveDBs/cache0")
+			count = 0
+			results = 0
+			while count < bands:
+				key, mates = q.get()
+				#time.sleep(0.1)
+				if key == -1:
+					count += 1
+					print count
+				else:
+					key = str(key)
+					if d.has_key(key):
+						temp_set = d[key]
+						for mate in mates:
+							temp_set.add(mate)
+						d[key] = temp_set
+					else:
+						d[key] = set(mates)
+			
+			# shelvesList = [shelve.open("shelveDBs/cache"+str(b), "r") for b
+			# 	 		   in xrange(1,bands)]
+			# for i in d.keys():
+			# 	finalSet = set(d[str(i)])
+			# 	#for b in xrange(1, bands):
+			# 		#d_temp = shelve.open("shelveDBs/cache"+str(b), "r")
+			# 	for d_temp in shelvesList:
+			# 		lst_temp = d_temp[i]
+			# 		#d_temp.close()
+			# 		for item in lst_temp:
+			# 			finalSet.add(item)
+			# 	d[str(i)] = list(finalSet)
+			
+			for key in d.keys():
+				print key, d[key]
+			
 			d.close()
+			logprint(log, False, "Number of candidate pairs:", results)
+			logprint(log, False, "Finished combining shelves in", 
+					 (time.clock() - tim) / 60, "minutes" )
 				
 			
 
@@ -1017,7 +1044,7 @@ def lshBandRedis(buckets, b, candidatePairs, log, r=None):
 	tim = time.clock()
 	logprint(log, True, "Running LSH and finding similar pairs...")
 	numPairsUnique = 0
-	d = shelve.open("shelveDBs/cache"+str(b), "c")
+	#d = shelve.open("shelveDBs/cache"+str(b), "c")
 	b += 1
 	
 	# SET VERSION
@@ -1057,17 +1084,20 @@ def lshBandRedis(buckets, b, candidatePairs, log, r=None):
 			for key in leftParts:
 				#pipe.rpush(key, rightParts)
 				#print key, rightParts
-				d[str(key)] = rightParts
+				#d[str(key)] = rightParts
+				r.put((key, rightParts))
 			for key in rightParts:
 				#pipe.rpush(key, leftParts)
 				#print key, leftParts
-				d[str(key)] = leftParts
+				#d[str(key)] = leftParts
+				r.put((key, leftParts))
 			#pipe.execute()
 
 	# for key in d.keys():
 	# 	print key, d[key]
 	
-	d.close()
+	#d.close()
+	r.put((-1, -1))
 
 	logprint(log, True, "Number of buckets in band", str(b)+":", len(buckets))
 	logprint(log, True, "Number of unique candidate pairs in band",
@@ -2173,8 +2203,8 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
 	logprint(log, False, "counterRightGroups:\n", Counter(numRightPartGroups))
 
 
-def multiSeqAlign(tup):
-	seqs, p, pool_size, num, log = tup
+def multiSeqAlign(seqs, p, pool_size, num, log):
+	#seqs, p, pool_size, num, log = tup
 	log = None
 	numMutations1 = 0
 	numMutations2 = 0
@@ -2183,7 +2213,6 @@ def multiSeqAlign(tup):
 	tim = time.clock()
 	#r = redis.StrictRedis()
 	r = shelve.open("shelveDBs/cache0", "r")
-	print r['1']
 	for read_R in xrange(p*2+1, secondSample+1, pool_size*2):
 		#print read_R
 
@@ -2240,6 +2269,7 @@ def multiSeqAlign(tup):
 	logprint(log, False, "numMutations2:", numMutations2)
 	#logprint(log, False, "counterAlignGroups:\n", Counter(numAlignedGroups))
 	#logprint(log, False, "counterRightGroups:\n", Counter(numRightPartGroups))
+	return p
 
 
 def initMultiSeqAlign(normal, diseased, pool, pool_size, log=None):
@@ -2250,9 +2280,13 @@ def initMultiSeqAlign(normal, diseased, pool, pool_size, log=None):
 	seqs = seqsNormal + seqsDiseased
 	num = len(seqs)
 	
-	params = [(seqs, p, pool_size, num, log) for p in range(0, pool_size)]
-	#params = (seqs, 0, pool_size, num, log)
-	results = pool.map(multiSeqAlign, params)
+	#params = [(seqs, p, pool_size, num, log) for p in range(0, pool_size)]
+	#params = (seqs, pool_size, num, log)
+	#results = pool.map(multiSeqAlign, params)
+	for b in xrange(pool_size):
+		p=Process(target=multiSeqAlign, args=(seqs, b, pool_size, num, log, ))
+		p.start()
+		p.join()
 	#multiSeqAlign(params)
 
 
@@ -3564,8 +3598,8 @@ def main():
 				# r = redis.StrictRedis()
 				# r.flushdb()
 				p_size = bands
-				pool = Pool(processes=p_size)
-				#pool = None
+				#pool = Pool(processes=p_size)
+				pool = None
 				candidatePairs = runLSH(normal_file, diseased_file, bands,
 					 				rows, k, seed, minhash_alg, test, log,
 									multiProcessing, pool)
