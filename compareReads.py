@@ -978,10 +978,15 @@ def lshBand(buckets, b, candidatePairs, log):
 	logprint(log, True, "Running LSH and finding similar pairs...")
 	numPairsUnique = 0
 	b += 1
+	maxBucket = 0
+	numBucketsPrintet = 0
 	logprint(log, False, "Bucket sizes:")
 	for bucket in buckets:
 		if len(buckets[bucket]) > 1:
 			logprint(log, False, str(bucket)+":", len(buckets[bucket]))
+			if len(buckets[bucket]) > maxBucket:
+				maxBucket = len(buckets[bucket])
+			numBucketsPrintet += 1
 		for i in xrange(len(buckets[bucket])):
 			id1 = buckets[bucket][i]
 			for j in xrange(i+1, len(buckets[bucket])):
@@ -1034,6 +1039,11 @@ def lshBand(buckets, b, candidatePairs, log):
 			 numPairs)
 	logprint(log, True, "Number of unique candidate pairs in band",
 			 str(b)+":", numPairsUnique)
+	
+	# temp
+	logprint(log, False, "Number of buckets:", len(buckets))
+	logprint(log, False, "Max bucket size:", maxBucket)
+	logprint(log, False, "Num buckets sizes printet:", numBucketsPrintet)
 
 	# print "Finished LSH for band", b, "in", (time.clock() - tim) / 60, \
 	#		"minutes"
