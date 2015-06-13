@@ -768,7 +768,7 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 				buckets = dict()
 				minhashing(normal, diseased, shingles, buckets, k, rows,
 						   minhash_alg, b, bands, p, log)
-				print len(buckets)
+				logprint(log, False, "Number of buckets", len(buckets))
 				lshBand(buckets, b, candidatePairs, log)
 			
 				# Stop if memory limit reached
@@ -836,12 +836,12 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 			d.close()
 			logprint(log, False, "Number of candidate pairs:", results)
 			logprint(log, False, "Finished combining shelves in", 
-					 (time.clock() - tim) / 60, "minutes" )
+					 (time.clock() - tim) / 60, "minutes")
 				
 			
 
-		#logprint(log, False, "\nNumber of unique candidate pairs",
-				 #sum(len(candidatePairs[i]) for i in candidatePairs)/2)
+		logprint(log, False, "\nNumber of unique candidate pairs",
+				 sum(len(candidatePairs[i]) for i in candidatePairs)/2)
 		logprint(log, False, "Finished LSH in",
 				 (time.clock() - tim) / 60, "minutes")
 		logprint(log, True, "Memory usage (in mb):", memory_usage_resource(),
@@ -978,7 +978,10 @@ def lshBand(buckets, b, candidatePairs, log):
 	logprint(log, True, "Running LSH and finding similar pairs...")
 	numPairsUnique = 0
 	b += 1
+	logprint(log, False, "Bucket sizes:")
 	for bucket in buckets:
+		if len(buckets[bucket]) > 1:
+			logprint(log, False, str(bucket)+":", len(buckets[bucket]))
 		for i in xrange(len(buckets[bucket])):
 			id1 = buckets[bucket][i]
 			for j in xrange(i+1, len(buckets[bucket])):
@@ -3593,7 +3596,7 @@ def main():
 		else:
 			# candidatePairs = runLSH(fasta_file, bands, rows, n, k, seed,
 			#						  minhash_alg, log)
-			multiProcessing = True
+			multiProcessing = False
 			if multiProcessing:
 				# r = redis.StrictRedis()
 				# r.flushdb()
@@ -3647,6 +3650,24 @@ def main():
 				os.system("echo '"+str(k)+"\t"+str(candidatePairs[0])+"\t"+
 						  str(candidatePairs[1])+"\t"+
 						  str(candidatePairs[2])+"' >> "+fasta_file)
+		elif test == 4:
+			"""
+			Count number of candidate pairs satisfying the naive sim
+			"""
+			naiveSim = 0.97
+			total = 0
+			satisfying = 0
+			seqs = getAllReads(normal_file, log) + \
+				   getAllReads(diseased_file, log)
+			for doc1 in candidatePairs:
+				for doc2 in candidatePairs[doc1]:
+					naive = globalAlignment(seqs[doc1],seqs[doc2], 32)
+					if naive >= naiveSim:
+						satisfying += 1
+					total += 1
+			logprint(log, False, "Satisfying naive sim:", satisfying)
+			logprint(log, False, "Total pairs:", total)
+			logprint(log, False, "Ratio:", float(satisfying)/total)
 		else:
 			# If no test to run on LSH, continue with contructing
 			#findMutations(candidatePairs, normal_file, diseased_file, log)
