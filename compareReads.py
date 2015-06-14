@@ -3674,6 +3674,8 @@ def main():
 					naive = globalAlignment(seqs[doc1],seqs[doc2], 32)
 					if naive >= naiveSim:
 						satisfying += 1
+					else:
+						logprint(log, False, seqs[doc1],"\n"+seqs[doc2],"\n"+str(naive),"\n")
 					total += 1
 			logprint(log, False, "Satisfying naive sim:", satisfying)
 			logprint(log, False, "Total pairs:", total)
