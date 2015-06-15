@@ -682,7 +682,7 @@ def getPrime(offset):
 #																			 #
 # ************************************************************************** #
 def doWork(tup, b, q):
-	time.sleep(b)
+	#time.sleep(b)
 	normal, diseased, shingles, k, rows, minhash_alg, bands, seqs, p = tup
 	#r = redis.StrictRedis()
 	buckets = dict()
@@ -791,7 +791,8 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 			params = (normal, diseased, shingles, k, rows, 
 					   minhash_alg, bands, seqs, p)
 			
-			start = 5
+			numProcs = 25
+			start = numProcs if numProcs <= bands else bands
 			prev_start = 0
 			stop = bands
 			count = 0
@@ -828,7 +829,7 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 						# else:
 						# 	d[key] = set(mates)
 			
-				start += 5
+				start += numProcs
 				if start > bands:
 					start = bands
 				# for key in candidatePairs:
@@ -1102,7 +1103,11 @@ def lshBandRedis(buckets, b, seqs, log, r=None):
 
 	# LIST VERSION
 	else:
+		skippedBuckets = 0
 		for bucket in buckets:
+			if len(buckets[bucket]) > 500:
+				skippedBuckets += 1
+				continue
 			for i in xrange(len(buckets[bucket])):
 				id1 = buckets[bucket][i]
 				mates = []
@@ -1150,10 +1155,11 @@ def lshBandRedis(buckets, b, seqs, log, r=None):
 	# for key in d.keys():
 	# 	print key, d[key]
 	
+	logprint(log, False, "Skipped buckets:", skippedBuckets)
 	logprint(log, False, "Number of buckets in band", str(b)+":",len(buckets))
 	logprint(log, False, "Number of unique candidate pairs in band",
 			 str(b)+":", numPairsUnique)
-	logprint(log, True, "Total number of candidate pairs:", total)
+	logprint(log, False, "Total number of candidate pairs:", total)
 	logprint(log, True, "Ratio:", float(numPairsUnique) / total)
 	
 	#d.close()
