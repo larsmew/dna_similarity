@@ -791,7 +791,7 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 			params = (normal, diseased, shingles, k, rows, 
 					   minhash_alg, bands, seqs, p)
 			
-			numProcs = 25
+			numProcs = 13
 			start = numProcs if numProcs <= bands else bands
 			prev_start = 0
 			stop = bands
