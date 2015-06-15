@@ -791,59 +791,70 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 			params = (normal, diseased, shingles, k, rows, 
 					   minhash_alg, bands, seqs, p)
 			
-			for b in xrange(bands):
-				p = Process(target=doWork, args=(params, b, q, ))
-				p.start()
-			#results = pool.map(doWork, params)
-			# pipe = r.pipeline()
-			
-			tim = time.clock()
-			logprint(log, False, "Combining candidate pairs...")
-			#d = shelve.open("shelveDBs/cache0")
+			start = 5
+			prev_start = 0
+			stop = bands
 			count = 0
-			results = 0
-			while count < bands:
-				key, mates = q.get()
-				#time.sleep(0.1)
-				if key == -1:
-					count += 1
-					print "Done bands:", count
-				else:
-					if key not in candidatePairs:
-						candidatePairs[key] = set()
-					for mate in mates:
-						candidatePairs[key].add(mate)
-					# key = str(key)
-					# if d.has_key(key):
-					# 	temp_set = d[key]
-					# 	for mate in mates:
-					# 		temp_set.add(mate)
-					# 	d[key] = temp_set
-					# else:
-					# 	d[key] = set(mates)
+			while True: #start < stop+1:
+				for b in xrange(prev_start, start):
+					print b
+					p = Process(target=doWork, args=(params, b, q, ))
+					p.start()
+				prev_start = start
+				#results = pool.map(doWork, params)
+				# pipe = r.pipeline()
 			
-			# for key in candidatePairs:
-			# 	print key, candidatePairs[key]
+				tim = time.clock()
+				logprint(log, False, "Combining candidate pairs...")
+				#d = shelve.open("shelveDBs/cache0")
+				results = 0
+				while count < start:
+					key, mates = q.get()
+					#time.sleep(0.1)
+					if key == -1:
+						count += 1
+						print "Done bands:", count
+					else:
+						if key not in candidatePairs:
+							candidatePairs[key] = set()
+						for mate in mates:
+							candidatePairs[key].add(mate)
+						# key = str(key)
+						# if d.has_key(key):
+						# 	temp_set = d[key]
+						# 	for mate in mates:
+						# 		temp_set.add(mate)
+						# 	d[key] = temp_set
+						# else:
+						# 	d[key] = set(mates)
 			
-			# shelvesList = [shelve.open("shelveDBs/cache"+str(b), "r") for b
-			# 	 		   in xrange(1,bands)]
-			# for i in d.keys():
-			# 	finalSet = set(d[str(i)])
-			# 	#for b in xrange(1, bands):
-			# 		#d_temp = shelve.open("shelveDBs/cache"+str(b), "r")
-			# 	for d_temp in shelvesList:
-			# 		lst_temp = d_temp[i]
-			# 		#d_temp.close()
-			# 		for item in lst_temp:
-			# 			finalSet.add(item)
-			# 	d[str(i)] = list(finalSet)
+				start += 5
+				if start > bands:
+					start = bands
+				# for key in candidatePairs:
+				# 	print key, candidatePairs[key]
+			
+				# shelvesList = [shelve.open("shelveDBs/cache"+str(b), "r") for b
+				# 	 		   in xrange(1,bands)]
+				# for i in d.keys():
+				# 	finalSet = set(d[str(i)])
+				# 	#for b in xrange(1, bands):
+				# 		#d_temp = shelve.open("shelveDBs/cache"+str(b), "r")
+				# 	for d_temp in shelvesList:
+				# 		lst_temp = d_temp[i]
+				# 		#d_temp.close()
+				# 		for item in lst_temp:
+				# 			finalSet.add(item)
+				# 	d[str(i)] = list(finalSet)
 			
 			
-			#d.close()
-			logprint(log, False, "Number of candidate pairs:", results)
-			logprint(log, False, "Finished combining candidate pairs in", 
-					 (time.clock() - tim) / 60, "minutes")
-				
+				#d.close()
+				logprint(log, False, "Number of candidate pairs:", results)
+				logprint(log, False, "Finished combining candidate pairs in", 
+						 (time.clock() - tim) / 60, "minutes")
+						 
+				if prev_start == bands:
+					break
 			
 
 		logprint(log, False, "\nNumber of unique candidate pairs",
@@ -1139,14 +1150,14 @@ def lshBandRedis(buckets, b, seqs, log, r=None):
 	# for key in d.keys():
 	# 	print key, d[key]
 	
-	#d.close()
-	r.put((-1, -1))
-
 	logprint(log, False, "Number of buckets in band", str(b)+":",len(buckets))
 	logprint(log, False, "Number of unique candidate pairs in band",
 			 str(b)+":", numPairsUnique)
 	logprint(log, True, "Total number of candidate pairs:", total)
 	logprint(log, True, "Ratio:", float(numPairsUnique) / total)
+	
+	#d.close()
+	r.put((-1, -1))
 
 	# print "Finished LSH for band", b, "in", (time.clock() - tim) / 60, \
 	#		"minutes"
@@ -3657,8 +3668,8 @@ def main():
 				# 		for mate in eval(mates):
 				# 			print mate
 				
-				initMultiSeqAlign(normal_file, diseased_file, candidatePairs,
-					 			  pool, p_size, log)
+				# initMultiSeqAlign(normal_file, diseased_file, candidatePairs,
+				# 	 			  pool, p_size, log)
 			
 			else:
 				candidatePairs = runLSH(normal_file, diseased_file, bands, 
