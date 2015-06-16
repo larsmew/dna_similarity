@@ -682,6 +682,8 @@ def getPrime(offset):
 #																			 #
 # ************************************************************************** #
 def doWork(tup, b=None, q=None):
+	if b > 13:
+		time.sleep(18000)
 	if b != None:
 		normal, diseased, shingles, k, rows, min_alg, bands, seqs, p = tup
 	else:
@@ -725,7 +727,7 @@ def doWork(tup, b=None, q=None):
 	#exportCandidatePairs(candidatePairs, filename, None, num)
 	#multiSeqAlign(normal, diseased, b, bands, prefix, suffix, num)
 	
-	return numPairs
+	return buckets
 
 
 def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multiProcessing, pool):
@@ -797,12 +799,16 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 				tim = time.clock()
 				logprint(log, False, "Combining candidate pairs...")
 				for tempDict in results:
+				#for _ in xrange(bands):
+					#tempDict = results.get()
 					for key in tempDict:
 						if key in candidatePairs:
 							for item in tempDict[key]:
 								candidatePairs[key].add(item)
 						else:
 							candidatePairs[key] = set(tempDict[key])
+				# for buckets in results:
+				# 	numPairs = lshBandRedis(buckets, b, seqs, None, None)
 				logprint(log, False, "Finished combining candidate pairs in",
 					 	 (time.clock() - tim) / 60, "minutes")
 				logprint(log, True, "Memory usage (in mb):", 
@@ -813,7 +819,7 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 				params = (normal, diseased, shingles, k, rows, 
 						   minhash_alg, bands, seqs, p)
 			
-				numProcs = 2
+				numProcs = 25
 				start = numProcs if numProcs <= bands else bands
 				prev_start = 0
 				stop = bands
@@ -873,14 +879,17 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 			
 			
 					#d.close()
-					logprint(log, False, "Finished combining candidate \
-						 pairs in", (time.clock() - tim) / 60, "minutes")
+					logprint(log, False, 
+							 "Finished combining candidate pairs in",
+							 (time.clock() - tim) / 60, "minutes")
 					logprint(log, True, "Memory usage (in mb):", 
 							 memory_usage_resource())
 				
 					# q.close()
 					# for p in processes:
 					# 	p.join()
+					print prev_start
+					print start
 					if prev_start == bands:
 						break
 			
@@ -3737,8 +3746,8 @@ def main():
 				# r = redis.StrictRedis()
 				# r.flushdb()
 				p_size = bands
-				pool = Pool(processes=p_size)
-				#pool = None
+				#pool = Pool(processes=p_size)
+				pool = None
 				candidatePairs = runLSH(normal_file, diseased_file, bands,
 					 				rows, k, seed, minhash_alg, test, log,
 									multiProcessing, pool)
