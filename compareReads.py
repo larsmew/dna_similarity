@@ -681,14 +681,17 @@ def getPrime(offset):
 #						  Locality Sensitive Hashing						 #
 #																			 #
 # ************************************************************************** #
-def doWork(tup, b, q):
-	#time.sleep(b)
-	normal, diseased, shingles, k, rows, minhash_alg, bands, seqs, p = tup
+def doWork(tup, b=None, q=None):
+	if b != None:
+		normal, diseased, shingles, k, rows, min_alg, bands, seqs, p = tup
+	else:
+		normal, diseased, shingles, k, rows, min_alg, b, bands, seqs, p = tup
+	print b
 	#r = redis.StrictRedis()
 	buckets = dict()
 	#candidatePairs = dict()
 	num = minhashing(normal, diseased, shingles, buckets, k, rows,
-			   minhash_alg, b, bands, p, None)
+			   min_alg, b, bands, p, None)
 	numPairs = lshBandRedis(buckets, b, seqs, None, q)
 	# for key, parts in lshBandRedis(buckets, b, candidatePairs, None, r):
 
@@ -784,78 +787,100 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 				#	  candidatePairs[idx].add(data)
 				#	  candDisk[idx] = candidatePairs[idx]
 		if multiProcessing:
-			q = Queue()
-			seqs = getAllReads(normal, log) + getAllReads(diseased, log)
-			# params = [(normal, diseased, shingles, k, rows,
-			# 	   minhash_alg, b, bands, p) for b in range(bands)]
-			params = (normal, diseased, shingles, k, rows, 
-					   minhash_alg, bands, seqs, p)
-			
-			numProcs = 13
-			start = numProcs if numProcs <= bands else bands
-			prev_start = 0
-			stop = bands
-			count = 0
-			while True: #start < stop+1:
-				for b in xrange(prev_start, start):
-					print b
-					p = Process(target=doWork, args=(params, b, q, ))
-					p.start()
-				prev_start = start
-				#results = pool.map(doWork, params)
-				# pipe = r.pipeline()
-			
+			if pool:
+				seqs = getAllReads(normal, log) + getAllReads(diseased, log)
+				params = [(normal, diseased, shingles, k, rows,
+					   minhash_alg, b, bands, seqs, p) for b in range(bands)]
+				results = pool.map(doWork, params)
 				tim = time.clock()
 				logprint(log, False, "Combining candidate pairs...")
-				#d = shelve.open("shelveDBs/cache0")
-				results = 0
-				while count < start:
-					key, mates = q.get()
-					#time.sleep(0.1)
-					if key == -1:
-						count += 1
-						print "Done bands:", count
-					else:
-						if key not in candidatePairs:
-							candidatePairs[key] = set()
-						for mate in mates:
-							candidatePairs[key].add(mate)
-						# key = str(key)
-						# if d.has_key(key):
-						# 	temp_set = d[key]
-						# 	for mate in mates:
-						# 		temp_set.add(mate)
-						# 	d[key] = temp_set
-						# else:
-						# 	d[key] = set(mates)
-				p.join()
-				start += numProcs
-				if start > bands:
-					start = bands
-				# for key in candidatePairs:
-				# 	print key, candidatePairs[key]
+				for tempDict in results:
+					for key in tempDict:
+						if key in candidatePairs:
+							for item in tempDict[key]:
+								candidatePairs[key].add(item)
+						else:
+							candidatePairs[key] = set(tempDict[key])
+				logprint(log, False, "Finished combining candidate pairs in",
+					 	 (time.clock() - tim) / 60, "minutes")
+				logprint(log, True, "Memory usage (in mb):", 
+						 memory_usage_resource())
+			else:
+				q = Queue()
+				seqs = getAllReads(normal, log) + getAllReads(diseased, log)
+				params = (normal, diseased, shingles, k, rows, 
+						   minhash_alg, bands, seqs, p)
 			
-				# shelvesList = [shelve.open("shelveDBs/cache"+str(b), "r") for b
-				# 	 		   in xrange(1,bands)]
-				# for i in d.keys():
-				# 	finalSet = set(d[str(i)])
-				# 	#for b in xrange(1, bands):
-				# 		#d_temp = shelve.open("shelveDBs/cache"+str(b), "r")
-				# 	for d_temp in shelvesList:
-				# 		lst_temp = d_temp[i]
-				# 		#d_temp.close()
-				# 		for item in lst_temp:
-				# 			finalSet.add(item)
-				# 	d[str(i)] = list(finalSet)
+				numProcs = 2
+				start = numProcs if numProcs <= bands else bands
+				prev_start = 0
+				stop = bands
+				count = 0
+				while True: #start < stop+1:
+				
+					#processes = []
+					for b in xrange(prev_start, start):
+						p = Process(target=doWork, args=(params, b, q, ))
+						p.start()
+						#processes.append(p)
+					prev_start = start
+					# pipe = r.pipeline()
+			
+					tim = time.clock()
+					logprint(log, False, "Combining candidate pairs...")
+					#d = shelve.open("shelveDBs/cache0")
+					results = 0
+					while count < start:
+						key, mates = q.get()
+						#time.sleep(0.1)
+						if key == -1:
+							count += 1
+							print "Done bands:", count
+						else:
+							if key not in candidatePairs:
+								candidatePairs[key] = set()
+							for mate in mates:
+								candidatePairs[key].add(mate)
+							# key = str(key)
+							# if d.has_key(key):
+							# 	temp_set = d[key]
+							# 	for mate in mates:
+							# 		temp_set.add(mate)
+							# 	d[key] = temp_set
+							# else:
+							# 	d[key] = set(mates)
+				
+					start += numProcs
+					if start > bands:
+						start = bands
+					# for key in candidatePairs:
+					# 	print key, candidatePairs[key]
+			
+					# shelvesList = [shelve.open("shelveDBs/cache"+str(b), "r") for b
+					# 	 		   in xrange(1,bands)]
+					# for i in d.keys():
+					# 	finalSet = set(d[str(i)])
+					# 	#for b in xrange(1, bands):
+					# 		#d_temp = shelve.open("shelveDBs/cache"+str(b), "r")
+					# 	for d_temp in shelvesList:
+					# 		lst_temp = d_temp[i]
+					# 		#d_temp.close()
+					# 		for item in lst_temp:
+					# 			finalSet.add(item)
+					# 	d[str(i)] = list(finalSet)
 			
 			
-				#d.close()
-				logprint(log, False, "Number of candidate pairs:", results)
-				logprint(log, False, "Finished combining candidate pairs in", 
-						 (time.clock() - tim) / 60, "minutes")
-						 
-				if prev_start == bands:
-					break
+					#d.close()
+					logprint(log, False, "Finished combining candidate \
+						 pairs in", (time.clock() - tim) / 60, "minutes")
+					logprint(log, True, "Memory usage (in mb):", 
+							 memory_usage_resource())
+				
+					# q.close()
+					# for p in processes:
+					# 	p.join()
+					if prev_start == bands:
+						break
 			
 
 		logprint(log, False, "\nNumber of unique candidate pairs",
@@ -1080,6 +1105,7 @@ def lshBandRedis(buckets, b, seqs, log, r=None):
 	naiveSim = 0.97
 	total = 0
 	o = 33  # overlap
+	skippedBuckets = 0
 	
 	# SET VERSION
 	if setVersion:
@@ -1102,8 +1128,7 @@ def lshBandRedis(buckets, b, seqs, log, r=None):
 			pipe.execute()
 
 	# LIST VERSION
-	else:
-		skippedBuckets = 0
+	elif r:
 		for bucket in buckets:
 			if len(buckets[bucket]) > 500:
 				skippedBuckets += 1
@@ -1128,7 +1153,47 @@ def lshBandRedis(buckets, b, seqs, log, r=None):
 								numPairsUnique += 1
 							total += 1
 				r.put((id1, mates))
-		
+		r.put((-1, -1))
+	
+	else:
+		candidatePairs = dict()
+		for bucket in buckets:
+			if len(buckets[bucket]) > 500:
+				skippedBuckets += 1
+				continue
+			for i in xrange(len(buckets[bucket])):
+				id1 = buckets[bucket][i]
+				for j in xrange(i+1, len(buckets[bucket])):
+					id2 = buckets[bucket][j]
+					if id1 % 2 == 0 and id2 % 2 == 1:
+						if id1 + 1 != id2:
+							naive = globalAlignment(seqs[id1], seqs[id2], o)
+							if naive >= naiveSim:
+								if id1 in candidatePairs:
+									candidatePairs[id1].append(id2)
+								else:
+									candidatePairs[id1] = [id2]
+								if id2 in candidatePairs:
+									candidatePairs[id2].append(id1)
+								else:
+									candidatePairs[id2] = [id1]
+							total += 1
+							numPairsUnique += 1
+					elif id1 % 2 == 1 and id2 % 2 == 0:
+						if id1 - 1 != id2:
+							naive = globalAlignment(seqs[id1], seqs[id2], o)
+							if naive >= naiveSim:
+								if id1 in candidatePairs:
+									candidatePairs[id1].append(id2)
+								else:
+									candidatePairs[id1] = [id2]
+								if id2 in candidatePairs:
+									candidatePairs[id2].append(id1)
+								else:
+									candidatePairs[id2] = [id1]
+							total += 1
+							numPairsUnique += 1
+		#return candidatePairs
 		
 		#pipe = r.pipeline()
 		# for bucket in buckets:
@@ -1163,13 +1228,14 @@ def lshBandRedis(buckets, b, seqs, log, r=None):
 	logprint(log, True, "Ratio:", float(numPairsUnique) / total)
 	
 	#d.close()
-	r.put((-1, -1))
 
 	# print "Finished LSH for band", b, "in", (time.clock() - tim) / 60, \
 	#		"minutes"
 
 	# print len(candidatePairs)
 
+	if not setVersion and not r:
+		return candidatePairs
 	return numPairsUnique
 
 
@@ -1636,11 +1702,17 @@ def globalAlignment(dna1, dna2, t, extraInfo=False):
 	doc1 is a leftpart and doc2 is a rightpart
 	"""
 	start = 0
+	start2 = 0
+	if len(dna1) > len(dna2):
+		#start2 = len(dna1) - len(dna2)
+		readLen = len(dna2)
+	else:
+		readLen = len(dna1)
 	if extraInfo:
 		bestScore = (0, 0, 0)
 	else:
 		bestScore = 0
-	seqLength = len(dna1)-start
+	seqLength = readLen-start
 	while seqLength > t:
 		# print seqLength, bestScore[1]
 		matches = 0
@@ -1675,7 +1747,7 @@ def globalAlignment(dna1, dna2, t, extraInfo=False):
 				if bestScore == 1.0:
 					return bestScore
 		start += 1
-		seqLength = len(dna1)-start
+		seqLength = readLen-start
 	return bestScore
 
 
@@ -3663,8 +3735,8 @@ def main():
 				# r = redis.StrictRedis()
 				# r.flushdb()
 				p_size = bands
-				#pool = Pool(processes=p_size)
-				pool = None
+				pool = Pool(processes=p_size)
+				#pool = None
 				candidatePairs = runLSH(normal_file, diseased_file, bands,
 					 				rows, k, seed, minhash_alg, test, log,
 									multiProcessing, pool)
