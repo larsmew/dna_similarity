@@ -788,7 +788,8 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 				#	  candDisk[idx] = candidatePairs[idx]
 		if multiProcessing:
 			if pool:
-				seqs = getAllReads(normal, log) + getAllReads(diseased, log)
+				#seqs = getAllReads(normal, log) + getAllReads(diseased, log)
+				seqs = None
 				params = [(normal, diseased, shingles, k, rows,
 					   minhash_alg, b, bands, seqs, p) for b in range(bands)]
 				results = pool.map(doWork, params)
