@@ -828,7 +828,7 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 						# 	d[key] = temp_set
 						# else:
 						# 	d[key] = set(mates)
-			
+				p.join()
 				start += numProcs
 				if start > bands:
 					start = bands
