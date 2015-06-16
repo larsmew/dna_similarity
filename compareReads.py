@@ -687,6 +687,7 @@ def doWork(tup, b=None, q=None):
 	else:
 		normal, diseased, shingles, k, rows, min_alg, b, bands, seqs, p = tup
 	print b
+	seqs = getAllReads(normal, log) + getAllReads(diseased, log)
 	#r = redis.StrictRedis()
 	buckets = dict()
 	#candidatePairs = dict()
@@ -1178,8 +1179,8 @@ def lshBandRedis(buckets, b, seqs, log, r=None):
 									candidatePairs[id2].append(id1)
 								else:
 									candidatePairs[id2] = [id1]
+								numPairsUnique += 1
 							total += 1
-							numPairsUnique += 1
 					elif id1 % 2 == 1 and id2 % 2 == 0:
 						if id1 - 1 != id2:
 							naive = globalAlignment(seqs[id1], seqs[id2], o)
@@ -1192,8 +1193,8 @@ def lshBandRedis(buckets, b, seqs, log, r=None):
 									candidatePairs[id2].append(id1)
 								else:
 									candidatePairs[id2] = [id1]
+								numPairsUnique += 1
 							total += 1
-							numPairsUnique += 1
 		#return candidatePairs
 		
 		#pipe = r.pipeline()
