@@ -689,8 +689,8 @@ def doWork(tup, b=None, q=None):
 		normal, diseased, shingles, k, rows, min_alg, bands, seqs, p = tup
 	else:
 		normal, diseased, shingles, k, rows, min_alg, b, bands, seqs, p = tup
+		seqs = getAllReads(normal, None) + getAllReads(diseased, None)
 	print b
-	seqs = getAllReads(normal, None) + getAllReads(diseased, None)
 	#r = redis.StrictRedis()
 	buckets = dict()
 	#candidatePairs = dict()
