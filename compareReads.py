@@ -684,8 +684,8 @@ def getPrime(offset):
 # ************************************************************************** #
 def doWork(tup, b=None, q=None):
 	if b > 12:
-		#time.sleep(18000)
-		time.sleep(b)
+		time.sleep(18000)
+		#time.sleep(b)
 	if b != None:
 		normal, diseased, shingles, k, rows, min_alg, bands, p = tup
 	else:
