@@ -682,15 +682,15 @@ def getPrime(offset):
 #																			 #
 # ************************************************************************** #
 def doWork(tup, b=None, q=None):
-	if b > 13:
+	if b > 12:
 		time.sleep(18000)
 		# time.sleep(b)
 	if b != None:
-		normal, diseased, shingles, k, rows, min_alg, bands, seqs, p = tup
+		normal, diseased, shingles, k, rows, min_alg, bands, p = tup
 	else:
-		normal, diseased, shingles, k, rows, min_alg, b, bands, seqs, p = tup
-		seqs = getAllReads(normal, None) + getAllReads(diseased, None)
+		normal, diseased, shingles, k, rows, min_alg, b, bands, p = tup
 	print b
+	seqs = getAllReads(normal, None) + getAllReads(diseased, None)
 	#r = redis.StrictRedis()
 	buckets = dict()
 	#candidatePairs = dict()
@@ -792,8 +792,6 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 				#	  candDisk[idx] = candidatePairs[idx]
 		if multiProcessing:
 			if pool:
-				#seqs = getAllReads(normal, log) + getAllReads(diseased, log)
-				seqs = None
 				numProcs = 3
 				start = numProcs if numProcs <= bands else bands
 				prev_start = 0
@@ -802,7 +800,7 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 					params = []
 					for b in xrange(prev_start, start):
 						params.append( (normal, diseased, shingles, k, rows,
-										minhash_alg, b, bands, seqs, p) )
+										minhash_alg, b, bands, p) )
 					prev_start = start
 					results = pool.map(doWork, params)
 					tim = time.clock()
@@ -831,9 +829,9 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 						break
 			else:
 				q = Queue()
-				seqs = getAllReads(normal, log) + getAllReads(diseased, log)
+				#seqs = getAllReads(normal, log) + getAllReads(diseased, log)
 				params = (normal, diseased, shingles, k, rows, 
-						   minhash_alg, bands, seqs, p)
+						   minhash_alg, bands, p)
 			
 				numProcs = 25
 				start = numProcs if numProcs <= bands else bands
