@@ -683,7 +683,8 @@ def getPrime(offset):
 # ************************************************************************** #
 def doWork(tup, b=None, q=None):
 	if b > 13:
-		time.sleep(18000)
+		# time.sleep(18000)
+		time.sleep(b)
 	if b != None:
 		normal, diseased, shingles, k, rows, min_alg, bands, seqs, p = tup
 	else:
@@ -793,26 +794,41 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 			if pool:
 				#seqs = getAllReads(normal, log) + getAllReads(diseased, log)
 				seqs = None
-				params = [(normal, diseased, shingles, k, rows,
-					   minhash_alg, b, bands, seqs, p) for b in range(bands)]
-				results = pool.map(doWork, params)
-				tim = time.clock()
-				logprint(log, False, "Combining candidate pairs...")
-				for tempDict in results:
-				#for _ in xrange(bands):
-					#tempDict = results.get()
-					for key in tempDict:
-						if key in candidatePairs:
-							for item in tempDict[key]:
-								candidatePairs[key].add(item)
-						else:
-							candidatePairs[key] = set(tempDict[key])
-				# for buckets in results:
-				# 	numPairs = lshBandRedis(buckets, b, seqs, None, None)
-				logprint(log, False, "Finished combining candidate pairs in",
-					 	 (time.clock() - tim) / 60, "minutes")
-				logprint(log, True, "Memory usage (in mb):", 
-						 memory_usage_resource())
+				numProcs = 25
+				start = numProcs if numProcs <= bands else bands
+				prev_start = 0
+				stop = bands
+				while True:
+					params = []
+					for b in xrange(prev_start, start):
+						params.append( (normal, diseased, shingles, k, rows,
+										minhash_alg, b, bands, seqs, p) )
+					prev_start = start
+					results = pool.map(doWork, params)
+					tim = time.clock()
+					logprint(log, False, "Combining candidate pairs...")
+					for tempDict in results:
+					#for _ in xrange(bands):
+						#tempDict = results.get()
+						for key in tempDict:
+							if key in candidatePairs:
+								for item in tempDict[key]:
+									candidatePairs[key].add(item)
+							else:
+								candidatePairs[key] = set(tempDict[key])
+					# for buckets in results:
+					# 	numPairs = lshBandRedis(buckets, b, seqs, None, None)
+					logprint(log, False, 
+							 "Finished combining candidate pairs in",
+						 	 (time.clock() - tim) / 60, "minutes")
+					logprint(log, True, "Memory usage (in mb):", 
+							 memory_usage_resource())
+					
+					start += numProcs
+					if start > bands:
+						start = bands
+					if prev_start == bands:
+						break
 			else:
 				q = Queue()
 				seqs = getAllReads(normal, log) + getAllReads(diseased, log)
@@ -888,8 +904,6 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 					# q.close()
 					# for p in processes:
 					# 	p.join()
-					print prev_start
-					print start
 					if prev_start == bands:
 						break
 			
