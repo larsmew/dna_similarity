@@ -302,7 +302,8 @@ def exportCandidatePairs(candidatePairs, output_file, log, numReads=None):
 					sortedElements = list(candidatePairs[id1])
 					for id2 in sortedElements[:-1]:
 						f.write(str(id2)+",")
-					f.write(str(sortedElements[-1]))
+					if len(sortedElements) > 0:
+						f.write(str(sortedElements[-1]))
 				f.write("\n")
 	elif ext == "txt2":
 		with open(output_file, "w") as f:
@@ -683,8 +684,8 @@ def getPrime(offset):
 # ************************************************************************** #
 def doWork(tup, b=None, q=None):
 	if b > 12:
-		time.sleep(18000)
-		# time.sleep(b)
+		#time.sleep(18000)
+		time.sleep(b)
 	if b != None:
 		normal, diseased, shingles, k, rows, min_alg, bands, p = tup
 	else:
