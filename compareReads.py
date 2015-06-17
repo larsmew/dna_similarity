@@ -683,8 +683,8 @@ def getPrime(offset):
 # ************************************************************************** #
 def doWork(tup, b=None, q=None):
 	if b > 13:
-		# time.sleep(18000)
-		time.sleep(b)
+		time.sleep(18000)
+		# time.sleep(b)
 	if b != None:
 		normal, diseased, shingles, k, rows, min_alg, bands, seqs, p = tup
 	else:
@@ -794,7 +794,7 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 			if pool:
 				#seqs = getAllReads(normal, log) + getAllReads(diseased, log)
 				seqs = None
-				numProcs = 25
+				numProcs = 3
 				start = numProcs if numProcs <= bands else bands
 				prev_start = 0
 				stop = bands
@@ -3760,7 +3760,7 @@ def main():
 				# r = redis.StrictRedis()
 				# r.flushdb()
 				p_size = bands
-				#pool = Pool(processes=p_size)
+				# pool = Pool(processes=p_size)
 				pool = None
 				candidatePairs = runLSH(normal_file, diseased_file, bands,
 					 				rows, k, seed, minhash_alg, test, log,
