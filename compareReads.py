@@ -371,7 +371,6 @@ def importCandidatePairs(input_file, log):
 			for line in f:
 				elements = line.split()
 				key = int(elements[0])
-				print elements[1]
 				pairs = map(int, elements[1].split(','))
 				candidatePairs[key] = pairs
 				imported += len(pairs)
