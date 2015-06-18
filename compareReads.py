@@ -26,7 +26,7 @@ import redis
 # LSH
 leftPartRatio = 0.5
 rightPartRatio = 0.5
-printMinhashProcess = 500000
+printMinhashProcess = 5000000
 setVersion = False
 
 # Sequence Alignment
@@ -685,8 +685,9 @@ def getPrime(offset):
 # ************************************************************************** #
 def doWork(tup, b=None, q=None):
 	if b > 12:
-		time.sleep(10800)
+		#time.sleep(9000)
 		#time.sleep(b)
+		time.sleep(18000)
 	if b != None:
 		normal, diseased, shingles, k, rows, min_alg, bands, p = tup
 	else:
@@ -716,21 +717,12 @@ def doWork(tup, b=None, q=None):
 	# 	r.rpush(i, lst)
 	print "Num buckets", len(buckets)
 	
-	# Obtain filenames
-	# filename = ntpath.basename(normal).rsplit(".", 1)[0]
-	# folder = filename+"_k_"+str(k)+"_b_"+str(bands)+"_r_"+str(rows)+\
-	# 		 "_m_"+str(minhash_alg)+"/"
-	# prefix = "lshOutput/"+folder+"b_"
-	# suffix = "_"+filename+"_k_"+str(k)+"_r_"+str(rows)+\
-	# 		 "_m_"+str(minhash_alg)+".temp"
-	# filename = prefix+str(b)+suffix
-	# os.system("mkdir lshOutput")
-	# os.system("mkdir lshOutput/"+folder)
-	
 	#exportCandidatePairs(candidatePairs, filename, None, num)
 	#multiSeqAlign(normal, diseased, b, bands, prefix, suffix, num)
 	
-	return buckets
+	#return buckets
+	sys.exit()
+	return None
 
 
 def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multiProcessing, pool):
@@ -860,6 +852,7 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 						if key == -1:
 							count += 1
 							print "Done bands:", count
+
 						else:
 							if key not in candidatePairs:
 								candidatePairs[key] = set()
@@ -1178,7 +1171,9 @@ def lshBandRedis(buckets, b, seqs, log, r=None):
 								numPairsUnique += 1
 							total += 1
 				r.put((id1, mates))
+		print "Dropping last"
 		r.put((-1, -1))
+		print "last dropped"
 	
 	else:
 		candidatePairs = dict()
