@@ -3756,7 +3756,7 @@ def main():
 		else:
 			# candidatePairs = runLSH(fasta_file, bands, rows, n, k, seed,
 			#						  minhash_alg, log)
-			multiProcessing = False
+			multiProcessing = True
 			if multiProcessing:
 				# r = redis.StrictRedis()
 				# r.flushdb()
