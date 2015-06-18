@@ -722,7 +722,7 @@ def doWork(tup, b=None, q=None):
 	#multiSeqAlign(normal, diseased, b, bands, prefix, suffix, num)
 	
 	#return buckets
-	sys.exit()
+	#sys.exit()
 	return None
 
 
