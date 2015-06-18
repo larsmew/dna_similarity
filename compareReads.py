@@ -3766,8 +3766,6 @@ def main():
 				# 		for mate in eval(mates):
 				# 			print mate
 				
-				# initMultiSeqAlign(normal_file, diseased_file, candidatePairs,
-				# 	 			  pool, p_size, log)
 			
 			else:
 				candidatePairs = runLSH(normal_file, diseased_file, bands, 
@@ -3825,6 +3823,12 @@ def main():
 			logprint(log, False, "Satisfying naive sim:", satisfying)
 			logprint(log, False, "Total pairs:", total)
 			logprint(log, False, "Ratio:", float(satisfying)/total)
+		elif test == 5:
+			p_size = bands
+			# pool = Pool(processes=p_size)
+			pool = None
+			initMultiSeqAlign(normal_file, diseased_file, candidatePairs,
+				 			  pool, p_size, log)
 		else:
 			# If no test to run on LSH, continue with contructing
 			#findMutations(candidatePairs, normal_file, diseased_file, log)
@@ -3834,6 +3838,8 @@ def main():
 				 "minutes")
 
 		return (time.clock() - totim)
+
+
 
 		### For Testing ###
 		reads = getAllReads(fasta_file, log)
