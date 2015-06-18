@@ -369,7 +369,7 @@ def importCandidatePairs(input_file, log):
 		with open(input_file, "r") as f:
 			imported = 0
 			for line in f:
-				elements = line.split("\t", 1)
+				elements = line.split()
 				key = int(elements[0])
 				print elements[1]
 				pairs = map(int, elements[1].split(','))
