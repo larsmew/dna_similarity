@@ -766,12 +766,13 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 		# Use Locality-Sensitive Hashing to compute for each bands the buckets
 		# with similar documents (reads) obtained by minhashing each read.
 		if not multiProcessing:
+			seqs = getAllReads(normal, None) + getAllReads(diseased, None)
 			for b in xrange(bands):
 				buckets = dict()
 				minhashing(normal, diseased, shingles, buckets, k, rows,
 						   minhash_alg, b, bands, p, log)
 				logprint(log, False, "Number of buckets", len(buckets))
-				lshBand(buckets, b, candidatePairs, log)
+				lshBand(buckets, b, candidatePairs, seqs, log)
 			
 				# Stop if memory limit reached
 				# limit = memory_usage_resource()
@@ -1035,34 +1036,46 @@ def minhashing(normal, diseased, shingles, buckets, k, rows, minhash_alg, bn, bs
 	return idx
 
 
-def lshBand(buckets, b, candidatePairs, log):
+def lshBand(buckets, b, candidatePairs, seqs, log):
 	tim = time.clock()
 	logprint(log, True, "Running LSH and finding similar pairs...")
 	numPairsUnique = 0
 	b += 1
+	naiveSim = 0.97
+	total = 0
+	o = 33  # overlap
+	skippedBuckets = 0
 	maxBucket = 0
 	numBucketsPrintet = 0
 	logprint(log, False, "Bucket sizes:")
 	for bucket in buckets:
-		if len(buckets[bucket]) > 1:
-			logprint(log, False, str(bucket)+":", len(buckets[bucket]))
-			if len(buckets[bucket]) > maxBucket:
-				maxBucket = len(buckets[bucket])
-			numBucketsPrintet += 1
+		# if len(buckets[bucket]) > 1:
+		# 	logprint(log, False, str(bucket)+":", len(buckets[bucket]))
+		# 	if len(buckets[bucket]) > maxBucket:
+		# 		maxBucket = len(buckets[bucket])
+		# 	numBucketsPrintet += 1
+		
 		for i in xrange(len(buckets[bucket])):
+			if len(buckets[bucket]) > 500:
+				skippedBuckets += 1
+				continue
 			id1 = buckets[bucket][i]
 			for j in xrange(i+1, len(buckets[bucket])):
 				id2 = buckets[bucket][j]
 				if id1 % 2 == 0 and id2 % 2 == 1:
 					if id1 + 1 != id2:
-						if id1 in candidatePairs:
-							candidatePairs[id1].add(id2)
-						else:
-							candidatePairs[id1] = set([id2])
-						if id2 in candidatePairs:
-							candidatePairs[id2].add(id1)
-						else:
-							candidatePairs[id2] = set([id1])
+						naive = globalAlignment(seqs[id1], seqs[id2], o)
+						if naive >= naiveSim:
+							if id1 in candidatePairs:
+								candidatePairs[id1].add(id2)
+							else:
+								candidatePairs[id1] = set([id2])
+							if id2 in candidatePairs:
+								candidatePairs[id2].add(id1)
+							else:
+								candidatePairs[id2] = set([id1])
+							numPairsUnique += 1
+						total += 1
 						# if id1 in candidatePairs:
 						# 	candidatePairs[id1].append(id2)
 						# else:
@@ -1071,17 +1084,21 @@ def lshBand(buckets, b, candidatePairs, log):
 						# 	candidatePairs[id2].append(id1)
 						# else:
 						# 	candidatePairs[id2] = [id1]
-						numPairsUnique += 1
+						
 				elif id1 % 2 == 1 and id2 % 2 == 0:
 					if id1 - 1 != id2:
-						if id1 in candidatePairs:
-							candidatePairs[id1].add(id2)
-						else:
-							candidatePairs[id1] = set([id2])
-						if id2 in candidatePairs:
-							candidatePairs[id2].add(id1)
-						else:
-							candidatePairs[id2] = set([id1])
+						naive = globalAlignment(seqs[id1], seqs[id2], o)
+						if naive >= naiveSim:
+							if id1 in candidatePairs:
+								candidatePairs[id1].add(id2)
+							else:
+								candidatePairs[id1] = set([id2])
+							if id2 in candidatePairs:
+								candidatePairs[id2].add(id1)
+							else:
+								candidatePairs[id2] = set([id1])
+							numPairsUnique += 1
+						total += 1
 						# if id1 in candidatePairs:
 						# 	candidatePairs[id1].append(id2)
 						# else:
@@ -1090,9 +1107,10 @@ def lshBand(buckets, b, candidatePairs, log):
 						# 	candidatePairs[id2].append(id1)
 						# else:
 						# 	candidatePairs[id2] = [id1]
-						numPairsUnique += 1
+						
 
 	logprint(log, True, "Number of buckets in band", str(b)+":", len(buckets))
+	logprint(log, False, "Skipped buckets:", skippedBuckets)
 	numPairs = 0
 	for bucket in buckets:
 		# print buckets[bucket]
@@ -1101,11 +1119,13 @@ def lshBand(buckets, b, candidatePairs, log):
 			 numPairs)
 	logprint(log, True, "Number of unique candidate pairs in band",
 			 str(b)+":", numPairsUnique)
+	logprint(log, False, "Total number of candidate pairs:", total)
+	logprint(log, True, "Ratio:", float(numPairsUnique) / total)
 	
 	# temp
-	logprint(log, False, "Number of buckets:", len(buckets))
-	logprint(log, False, "Max bucket size:", maxBucket)
-	logprint(log, False, "Num buckets sizes printet:", numBucketsPrintet)
+	#logprint(log, False, "Number of buckets:", len(buckets))
+	#logprint(log, False, "Max bucket size:", maxBucket)
+	#logprint(log, False, "Num buckets sizes printet:", numBucketsPrintet)
 
 	# print "Finished LSH for band", b, "in", (time.clock() - tim) / 60, \
 	#		"minutes"
@@ -3755,7 +3775,7 @@ def main():
 		else:
 			# candidatePairs = runLSH(fasta_file, bands, rows, n, k, seed,
 			#						  minhash_alg, log)
-			multiProcessing = True
+			multiProcessing = False
 			if multiProcessing:
 				# r = redis.StrictRedis()
 				# r.flushdb()
