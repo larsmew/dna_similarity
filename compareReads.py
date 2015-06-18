@@ -38,6 +38,7 @@ maxAlignments = 1 # per read
 requiredOverlaps = 4
 maxCandMates = 5000
 MUTFIND = 1
+p_id = -1
 
 
 # Test variables
@@ -2359,6 +2360,8 @@ def sequenceAlignment(candidatePairs, normal, diseased, log):
 
 def multiSeqAlign(seqs, p, pool_size, num, candidatePairs, log):
 	#seqs, p, pool_size, num, log = tup
+	global p_id
+	p_id = p
 	log = None
 	numMutations1 = 0
 	numMutations2 = 0
@@ -3358,6 +3361,8 @@ def newFindMutation(read_R, seqs, alignedGroups, log):
 def oldFindMutation(read_R, seqs, alignedGroups, log):
 	numUsefulGroups = 0
 	anchorLen = len(seqs[read_R-1])+len(seqs[read_R])
+	if log == None:
+		log = open("usefulGroups/"+str(p_id)+".txt","w")
 	for group in alignedGroups:
 		for rightPartGroup in group.rightPartGroups:
 			# Check if groups contains enough information to analyze
@@ -3750,7 +3755,7 @@ def main():
 		else:
 			# candidatePairs = runLSH(fasta_file, bands, rows, n, k, seed,
 			#						  minhash_alg, log)
-			multiProcessing = True
+			multiProcessing = False
 			if multiProcessing:
 				# r = redis.StrictRedis()
 				# r.flushdb()
