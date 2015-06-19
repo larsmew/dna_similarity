@@ -1047,18 +1047,17 @@ def lshBand(buckets, b, candidatePairs, seqs, log):
 	skippedBuckets = 0
 	maxBucket = 0
 	numBucketsPrintet = 0
-	logprint(log, False, "Bucket sizes:")
+	# logprint(log, False, "Bucket sizes:")
 	for bucket in buckets:
 		# if len(buckets[bucket]) > 1:
 		# 	logprint(log, False, str(bucket)+":", len(buckets[bucket]))
 		# 	if len(buckets[bucket]) > maxBucket:
 		# 		maxBucket = len(buckets[bucket])
 		# 	numBucketsPrintet += 1
-		
+		if len(buckets[bucket]) > 500:
+			skippedBuckets += 1
+			continue
 		for i in xrange(len(buckets[bucket])):
-			if len(buckets[bucket]) > 500:
-				skippedBuckets += 1
-				continue
 			id1 = buckets[bucket][i]
 			for j in xrange(i+1, len(buckets[bucket])):
 				id2 = buckets[bucket][j]
