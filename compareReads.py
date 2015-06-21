@@ -1063,18 +1063,27 @@ def lshBand(buckets, b, candidatePairs, seqs, log):
 				id2 = buckets[bucket][j]
 				if id1 % 2 == 0 and id2 % 2 == 1:
 					if id1 + 1 != id2:
-						naive = globalAlignment(seqs[id1], seqs[id2], o)
-						if naive >= naiveSim:
-							if id1 in candidatePairs:
-								candidatePairs[id1].add(id2)
-							else:
-								candidatePairs[id1] = set([id2])
-							if id2 in candidatePairs:
-								candidatePairs[id2].add(id1)
-							else:
-								candidatePairs[id2] = set([id1])
-							numPairsUnique += 1
-						total += 1
+						# naive = globalAlignment(seqs[id1], seqs[id2], o)
+						# if naive >= naiveSim:
+						# 	if id1 in candidatePairs:
+						# 		candidatePairs[id1].add(id2)
+						# 	else:
+						# 		candidatePairs[id1] = set([id2])
+						# 	if id2 in candidatePairs:
+						# 		candidatePairs[id2].add(id1)
+						# 	else:
+						# 		candidatePairs[id2] = set([id1])
+						# 	numPairsUnique += 1
+						# total += 1
+						if id1 in candidatePairs:
+							candidatePairs[id1].add(id2)
+						else:
+							candidatePairs[id1] = set([id2])
+						if id2 in candidatePairs:
+							candidatePairs[id2].add(id1)
+						else:
+							candidatePairs[id2] = set([id1])
+						numPairsUnique += 1
 						# if id1 in candidatePairs:
 						# 	candidatePairs[id1].append(id2)
 						# else:
@@ -1086,18 +1095,29 @@ def lshBand(buckets, b, candidatePairs, seqs, log):
 						
 				elif id1 % 2 == 1 and id2 % 2 == 0:
 					if id1 - 1 != id2:
-						naive = globalAlignment(seqs[id1], seqs[id2], o)
-						if naive >= naiveSim:
-							if id1 in candidatePairs:
-								candidatePairs[id1].add(id2)
-							else:
-								candidatePairs[id1] = set([id2])
-							if id2 in candidatePairs:
-								candidatePairs[id2].add(id1)
-							else:
-								candidatePairs[id2] = set([id1])
-							numPairsUnique += 1
-						total += 1
+						# naive = globalAlignment(seqs[id1], seqs[id2], o)
+						# if naive >= naiveSim:
+						# 	if id1 in candidatePairs:
+						# 		candidatePairs[id1].add(id2)
+						# 	else:
+						# 		candidatePairs[id1] = set([id2])
+						# 	if id2 in candidatePairs:
+						# 		candidatePairs[id2].add(id1)
+						# 	else:
+						# 		candidatePairs[id2] = set([id1])
+						# 	numPairsUnique += 1
+						# total += 1
+						
+						if id1 in candidatePairs:
+							candidatePairs[id1].add(id2)
+						else:
+							candidatePairs[id1] = set([id2])
+						if id2 in candidatePairs:
+							candidatePairs[id2].add(id1)
+						else:
+							candidatePairs[id2] = set([id1])
+						numPairsUnique += 1
+						
 						# if id1 in candidatePairs:
 						# 	candidatePairs[id1].append(id2)
 						# else:
