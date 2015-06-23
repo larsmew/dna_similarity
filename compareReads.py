@@ -1491,7 +1491,7 @@ def minhashing_alg7(dna, idx, shingles, buckets, k, rows, p, a, b, n):
 		minVal = n
 		for pos in docShingles:
 			#pos = shingles[shingle]
-			val = ((a[i]*pos+b[i]) % p) % n
+			val = ((a[i]*pos+b[i]) % p) # % n
 			if val < minVal:
 				minVal = val
 		signature.append(minVal)
