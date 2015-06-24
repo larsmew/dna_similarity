@@ -1139,7 +1139,7 @@ def lshBand(buckets, b, candidatePairs, seqs, log):
 	logprint(log, True, "Number of unique candidate pairs in band",
 			 str(b)+":", numPairsUnique)
 	logprint(log, False, "Total number of candidate pairs:", total)
-	logprint(log, True, "Ratio:", float(numPairsUnique) / total)
+	# logprint(log, True, "Ratio:", float(numPairsUnique) / total)
 	
 	# temp
 	#logprint(log, False, "Number of buckets:", len(buckets))
