@@ -21,6 +21,7 @@ import math
 import resource
 import ntpath
 import redis
+import tarfile
 
 """ global variables """
 # LSH
@@ -472,7 +473,7 @@ def computeShinglesTable(fasta_file, shinglesPos, k, log):
 					if len(leftpart) < k:
 						logprint(log, False,
 								 "ERROR: k larger than part length\n",
-								 "		Pick k smaller than", len(leftpart)
+								 "		 Pick k smaller than", len(leftpart)
 						)
 						sys.exit()
 					read = ""
@@ -544,79 +545,119 @@ def computeShinglesSet(fasta_file, shingles, k, log):
 		return shingles
 
 
-def getAllReads(fasta_file, log):
-	"""
-	Extract the reads (DNA sequences) from the given fasta file.
-	"""
+def getAllReads(fasta_file, log, parts=True):
 	if fasta_file:
-		with open(fasta_file, "rU") as fasta_f:
-			read = ""
-			tim = time.clock()
-			logprint(log, False, "Collecting reads from file", fasta_file)
-			reads = []
-			seqs = 0
-			for line in fasta_f:
-				# If line starts with ">", which indicates end of a sequence, append it to list of reads
-				if line.startswith(">"):
-					if read != "":
-						seqs += 1
-						# Splits the string into two parts
-						leftpart = read[:len(read)/2]
-						rightpart = read[len(read)/2:]
-						reads.append(leftpart)
-						reads.append(rightpart)
-						read = ""
-				# Concatenate multi-line sequences into one string
+		reads = []
+		ext = fasta_file.rsplit(".", 1)[1]
+		if ext == "fasta":
+			with open(fasta_file, "r") as f:
+				reads = parseFasta(fasta_file, f, log, parts)
+		elif ext == "fastq":
+			with open(fasta_file, "r") as f:
+				reads = parseFastq(fasta_file, f, log, parts)
+		elif ext == "gz" or ext == "tar":
+			tar = tarfile.open(fasta_file, "r")
+			for file in tar.getmembers():
+				ext = file.name.rsplit(".", 1)
+				if len(ext) > 1:
+					ext = file.name.rsplit(".", 1)[1]
 				else:
-					read += line.strip().upper()
-			if read != "":
-				seqs += 1
-				leftpart = read[:len(read)/2]
-				rightpart = read[len(read)/2:]
-				reads.append(leftpart)
-				reads.append(rightpart)
-
-		logprint(log, False, "Finished reading in",
-				 (time.clock() - tim) / 60, "minutes")
-		logprint(log, False, "Found", seqs, "sequences in fasta file")
-		logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
+					continue
+				print ext
+				if ext == "fasta":
+					f = tar.extractfile(file)
+					reads += parseFasta(fasta_file, f, log, parts)
+				elif ext == "fastq":
+					f = tar.extractfile(file)
+					reads += parseFastq(fasta_file, f, log, parts)
+		else:
+			print "File format", "*"+ext+"*", "is NOT supported. Use FASTA", 
+			print "or FASTQ, possibly compressed as tar.gz."
+			sys.exit()
+		
 		return reads
+	
 	else:
 		return []
 
 
-def getFullReads(fasta_file, log):
-	"""
-	Extract the reads (DNA sequences) from the given fasta file.
-	"""
-	if fasta_file:
-		with open(fasta_file, "rU") as fasta_f:
-			read = ""
-			tim = time.clock()
-			logprint(log, False, "Collecting reads from file", fasta_file)
-			reads = []
-			seqs = 0
-			for line in fasta_f:
-				# If line starts with ">", which indicates end of a sequence, append it to list of reads
-				if line.startswith(">"):
-					if read != "":
-						seqs += 1
-						reads.append(read)
-						read = ""
-				# Concatenate multi-line sequences into one string
-				else:
-					read += line.strip().upper()
+def parseFastq(filename, fasta_f, log, parts=True):
+	read = ""
+	tim = time.clock()
+	logprint(log, False, "Collecting reads from file", filename)
+	reads = []
+	seqs = 0
+	seq_line = False
+	for line in fasta_f:
+		# If line starts with ">", which indicates end of a sequence, append it to list of reads
+		if line.startswith("@"):
+			seq_line = True
+		elif line.startswith("+"):
 			if read != "":
 				seqs += 1
-				reads.append(read)
+				if parts:
+					# Splits the string into two parts
+					leftpart = read[:len(read)/2]
+					rightpart = read[len(read)/2:]
+					reads.append(leftpart)
+					reads.append(rightpart)
+				else:
+					reads.append(read)
+				read = ""
+				seq_line = False
+		elif seq_line:
+			# Concatenate multi-line sequences into one string
+			read += line.strip().upper()
 
-		logprint(log, False, "Finished reading in",
-				 (time.clock() - tim) / 60, "minutes")
-		logprint(log, False, "Found", seqs, "sequences in fasta file")
-		logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
-		return reads
-	else:
-		return []
+	logprint(log, False, "Finished reading in", (time.clock() - tim) / 60, "minutes")
+	logprint(log, False, "Found", seqs, "sequences in fasta file")
+	logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
+	return reads
+
+
+def parseFasta(filename, fasta_f, log, parts=True):
+	"""
+	Extract the reads (DNA sequences) from the given fasta file.
+	Splits the reads into two equally (for now) sized parts.
+	"""
+	read = ""
+	tim = time.clock()
+	logprint(log, False, "Collecting reads from file", filename)
+	reads = []
+	seqs = 0
+	for line in fasta_f:
+		# If line starts with ">", which indicates end of a sequence, 
+		# append it to list of reads
+		if line.startswith(">"):
+			if read != "":
+				seqs += 1
+				if parts:
+					# Splits the string into two parts
+					leftpart = read[:len(read)/2]
+					rightpart = read[len(read)/2:]
+					reads.append(leftpart)
+					reads.append(rightpart)
+				else:
+					reads.append(read)
+				read = ""
+		# Concatenate multi-line sequences into one string
+		else:
+			read += line.strip().upper()
+	if read != "":
+		seqs += 1
+		if parts:
+			leftpart = read[:len(read)/2]
+			rightpart = read[len(read)/2:]
+			reads.append(leftpart)
+			reads.append(rightpart)
+		else:
+			reads.append(read)
+
+	logprint(log, False, "Finished reading in",
+			 (time.clock() - tim) / 60, "minutes")
+	logprint(log, False, "Found", seqs, "sequences in fasta file")
+	logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
+	return reads
 
 
 def getPartsFromFile(fasta_file, log):
@@ -744,6 +785,9 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 		random.seed(seed)
 		candidatePairs = dict()
 		#candDisk = shelve.open("testDictDisk")
+		
+		getAllReads(normal, log)
+		sys.exit()
 		
 		if minhash_alg == 7:
 			p = getPrime(4**k)
@@ -1036,7 +1080,7 @@ def minhashing(normal, diseased, shingles, buckets, k, rows, minhash_alg, bn, bs
 	return idx
 
 
-def lshBand(buckets, b, candidatePairs, seqs, log):
+def lshBand(buckets, b, candidatePairs, log):
 	tim = time.clock()
 	logprint(log, True, "Running LSH and finding similar pairs...")
 	numPairsUnique = 0
@@ -1502,58 +1546,6 @@ def minhashing_alg7(dna, idx, shingles, buckets, k, rows, p, a, b, n):
 		buckets[key].append(idx)
 	else:
 		buckets[key] = [idx]
-
-
-# ************************************************************************** #
-#																			 #
-#								BuhLSH Testing								 #
-#																			 #
-# ************************************************************************** #
-def buhLSH(normal, diseased, bands, k, seed, log):
-	"""
-	FAR FROM FUNCTIONAL
-	"""
-	tim = time.clock()
-	random.seed(seed)
-	candidatePairs = dict()
-
-	mis = 1 # r
-	picks = 30 # k
-	idx = 0
-	length = 37
-
-	buckets = dict()
-	for b in xrange(bands):
-		lshValue = [random.randrange(k) for i in xrange(picks)]
-		for part in getPartsFromFile(normal, log):
-			# kmers = getDocShingles(part, k)
-			# for kmer in kmers:
-			#	  value = [kmer[i] for i in lshValue]
-			#	  print value
-			value = [part[i] for i in lshValue]
-			key = ','.join(map(str, value))
-			if key in buckets:
-				buckets[key].append(idx)
-			else:
-				buckets[key] = [idx]
-			idx += 1
-		lshBand(buckets, b, candidatePairs, log)
-
-		buckets.clear()
-
-	logprint(log, False, "\nNumber of unique candidate pairs",
-			 sum(len(candidatePairs[i]) for i in candidatePairs)/2)
-	logprint(log, False, "Finished LSH in",
-			 (time.clock() - tim) / 60, "minutes")
-	logprint(log, True, "Memory usage (in mb):", memory_usage_resource(),
-			 "\n")
-
-	reads = getAllReads(normal, log) + getAllReads(diseased, log)
-	for id1 in candidatePairs:
-		for id2 in candidatePairs[id1]:
-			print id1,id2
-			print jaccardSim(reads[id1], reads[id2], k)
-
 
 
 # ************************************************************************** #
@@ -2302,14 +2294,6 @@ def getMates(read, r):
 		 	return []
 		else:
 			return mates
-		#for mates in r.lrange(read,0,-1):
-		# for mates in r[str(read)]:
-		# 	#mates = eval(mates)
-		# 	print mates
-		# 	if len(mates) > maxCandMates:
-		# 		continue
-		# 	for mate in mates:
-		# 		yield mate
 
 
 def sequenceAlignment(candidatePairs, normal, diseased, log):
@@ -3525,14 +3509,14 @@ def findMutation(read_R, seqs, leftparts, rightparts, mutationsPos, first, log):
 #																			 #
 # ************************************************************************** #
 def findMutations(candidatePairs, normal, diseased, log):
-	seqsNormal = getFullReads(normal, log)
+	seqsNormal = getAllReads(normal, log, parts=False)
 	global secondSample
 	secondSample = len(seqsNormal)
-	seqsDiseased = getFullReads(diseased, log)
+	seqsDiseased = getAllReads(diseased, log, parts=False)
 	seqs = seqsNormal + seqsDiseased
 
 	numUsefulGroups = 0
-	numParts = len(candidatePairs) / 2 / 2 + 1
+	numParts = len(candidatePairs) / 2 / 2 + 1 # Bad estimate
 	prog = 0
 	tim = time.clock()
 	for read_R in candidatePairs:
