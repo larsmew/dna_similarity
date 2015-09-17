@@ -31,7 +31,7 @@ setVersion = False
 
 # Sequence Alignment
 M1 = 1
-M2 = 3
+M2 = 2
 secondSample = 0
 overlap = 8 # Overlap region in both directions i.e. 20 overlap in total if 10
 maxAlignments = 1 # per read
@@ -153,7 +153,7 @@ def optionParse():
 					  default="naive",
 					  action="store",
 					  dest="sim",
-					  help="set <VALUE> as similairy measure to use.")
+					  help="set <VALUE> as similairy measure to use (obsolete).")
 
 	parser.add_option("-m", "--minhash_alg",
 					  metavar="<VALUE>",
@@ -237,13 +237,10 @@ def logprint(log_file, flush, *output):
 	Prints to standard out and to log file
 	"""
 	log_output = ""
-	#for element in output:
-	#	 log_output += str(element) + " "
 	log_output = " ".join(map(str, output))
 	print log_output
 	if log_file:
-		log_output += "\n"
-		log_file.write(log_output)
+		log_file.write(log_output + "\n")
 		if flush:
 			log_file.flush()
 
@@ -294,6 +291,8 @@ def exportCandidatePairs(candidatePairs, output_file, log, numReads=None):
 					f.write(str(id2)+",")
 				if len(sortedElements) > 0:
 					f.write(str(sortedElements[-1])+"\n")
+
+	# Test-only write the first numReads reads to output file.
 	elif ext == "temp":
 		with open(output_file, "w") as f:
 			for id1 in xrange(numReads):
@@ -307,6 +306,7 @@ def exportCandidatePairs(candidatePairs, output_file, log, numReads=None):
 					if len(sortedElements) > 0:
 						f.write(str(sortedElements[-1]))
 				f.write("\n")
+
 	elif ext == "txt2":
 		with open(output_file, "w") as f:
 			for id1 in candidatePairs:
@@ -791,12 +791,13 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 			p = getPrime(4**k)
 			shingles = None
 		# Computes table of all k-shingles and their position
-		elif minhash_alg == 3 or minhash_alg > 5:
+		elif minhash_alg == 3 or minhash_alg == 6:
 			# shingles = computeShinglesTable(fasta_file, k, log)
 			shingles = dict()
 			shingles = computeShinglesTable(normal, shingles, k, log)
 			shingles = computeShinglesTable(diseased, shingles, k, log)
-			p = getPrime(len(shingles))
+			# p = getPrime(len(shingles))
+			p = 0
 		# Computes set of all k-shingles
 		else:  # minhash alg 1, 2, 4 or 5
 			# shingles = computeShinglesSet(fasta_file, k, log)
@@ -804,11 +805,12 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 			shingles = computeShinglesSet(normal, shingles, k, log)
 			shingles = computeShinglesSet(diseased, shingles, k, log)
 			shingles = list(shingles)
-			p = getPrime(len(shingles))
+			#p = getPrime(len(shingles))
+			p = 0
 		# Use Locality-Sensitive Hashing to compute for each bands the buckets
 		# with similar documents (reads) obtained by minhashing each read.
 		if not multiProcessing:
-			seqs = getAllReads(normal, None) + getAllReads(diseased, None)
+			# seqs = getAllReads(normal, None) + getAllReads(diseased, None)
 			for b in xrange(bands):
 				buckets = dict()
 				minhashing(normal, diseased, shingles, buckets, k, rows,
@@ -965,13 +967,6 @@ def getDocShingles(dna, k, asSet=True):
 		shingles = {dna[i:i+k] for i in xrange(len(dna)-k+1)}
 	else: # as list
 		shingles = [toBase10(dna[i:i+k]) for i in xrange(len(dna)-k+1)]
-
-	# if not asSet:
-	# 	index = []
-	# 	for shingle in shingles:
-	# 		index.append(toBase10(shingle))
-	# 	return index
-
 	return shingles
 
 
@@ -992,44 +987,37 @@ def toBase10(seq):
 	return n
 
 
-def minhashing(normal, diseased, shingles, buckets, k, rows, minhash_alg, bn, bs, p, log):
+def minhashing(normal, diseased, kmers, buckets, k, rows, minhash_alg, bn, bs, p, log):
 	tim = time.clock()
-	random.seed(bn)
-	#logprint(log, True, "Minhashing...")
+	logprint(log, True, "Minhashing...")
+	# random.seed(bn)
 
-	# minhashAlg = { '1' : minhashing_alg1,
-	#				 '2' : minhashing_alg2,
-	#				 '3' : minhashing_alg3,
-	#				 '4' : minhashing_alg4,
-	#				 '5' : minhashing_alg5,
-	#				 '6' : minhashing_alg6,
-	# }
-	# rows = rows * bs
 	idx = 0
 	if minhash_alg < 4:
-		hashfuncs = computeHashFunctions(rows, shingles, log)
+		hashfuncs = computeHashFunctions(rows, kmers, log)
 	else:
 		if minhash_alg == 7:
 			n = 4**k
 		else:
-			n = len(shingles)
+			n = len(kmers)
+		p = getPrime(n) # temp
 		a = [random.randrange(1, n) for i in xrange(rows)]
 		b = [random.randrange(n) for i in xrange(rows)]
 	for part in getPartsFromFile(normal, log):
 		if minhash_alg == 6:  # Default minhash alg 6
-			minhashing_alg6(part, idx, shingles, buckets, k, rows, p, a, b, n)
+			minhashing_alg6(part, idx, kmers, buckets, k, rows, p, a, b, n)
 		elif minhash_alg == 7:
-			minhashing_alg7(part, idx, shingles, buckets, k, rows, p, a, b, n)
+			minhashing_alg7(part, idx, kmers, buckets, k, rows, p, a, b, n)
 		elif minhash_alg == 1:
-			minhashing_alg1(part, idx, shingles, buckets, k, rows, hashfuncs)
+			minhashing_alg1(part, idx, kmers, buckets, k, rows, hashfuncs)
 		elif minhash_alg == 2:
-			minhashing_alg2(part, idx, shingles, buckets, k, rows, hashfuncs)
+			minhashing_alg2(part, idx, kmers, buckets, k, rows, hashfuncs)
 		elif minhash_alg == 3:
-			minhashing_alg3(part, idx, shingles, buckets, k, rows, hashfuncs)
+			minhashing_alg3(part, idx, kmers, buckets, k, rows, hashfuncs)
 		elif minhash_alg == 4:
-			minhashing_alg4(part, idx, shingles, buckets, k, rows, p, a, b)
+			minhashing_alg4(part, idx, kmers, buckets, k, rows, p, a, b)
 		elif minhash_alg == 5:
-			minhashing_alg5(part, idx, shingles, buckets, k, rows, p, a, b)
+			minhashing_alg5(part, idx, kmers, buckets, k, rows, p, a, b)
 
 		idx += 1
 
@@ -1044,19 +1032,19 @@ def minhashing(normal, diseased, shingles, buckets, k, rows, minhash_alg, bn, bs
 
 	for part in getPartsFromFile(diseased, log):
 		if minhash_alg == 6:  # Default minhash alg 6
-			minhashing_alg6(part, idx, shingles, buckets, k, rows, p, a, b, n)
+			minhashing_alg6(part, idx, kmers, buckets, k, rows, p, a, b, n)
 		elif minhash_alg == 7:
-			minhashing_alg7(part, idx, shingles, buckets, k, rows, p, a, b, n)
+			minhashing_alg7(part, idx, kmers, buckets, k, rows, p, a, b, n)
 		elif minhash_alg == 1:
-			minhashing_alg1(part, idx, shingles, buckets, k, rows, hashfuncs)
+			minhashing_alg1(part, idx, kmers, buckets, k, rows, hashfuncs)
 		elif minhash_alg == 2:
-			minhashing_alg2(part, idx, shingles, buckets, k, rows, hashfuncs)
+			minhashing_alg2(part, idx, kmers, buckets, k, rows, hashfuncs)
 		elif minhash_alg == 3:
-			minhashing_alg3(part, idx, shingles, buckets, k, rows, hashfuncs)
+			minhashing_alg3(part, idx, kmers, buckets, k, rows, hashfuncs)
 		elif minhash_alg == 4:
-			minhashing_alg4(part, idx, shingles, buckets, k, rows, p, a, b)
+			minhashing_alg4(part, idx, kmers, buckets, k, rows, p, a, b)
 		elif minhash_alg == 5:
-			minhashing_alg5(part, idx, shingles, buckets, k, rows, p, a, b)
+			minhashing_alg5(part, idx, kmers, buckets, k, rows, p, a, b)
 
 		idx += 1
 
