@@ -20,7 +20,6 @@ import shelve
 import math
 import resource
 import ntpath
-import redis
 import tarfile
 
 """ global variables """
@@ -186,7 +185,7 @@ def optionParse():
 					  action="store",
 					  dest="S",
 					  help="Reads required to support mutation.")
-	
+
 	parser.add_option("-o", "--mismatch_overlap",
 					  metavar="<VALUE>",
 					  type=int,
@@ -194,7 +193,7 @@ def optionParse():
 					  action="store",
 					  dest="o",
 					  help="Number of allowed mismatches in overlap.")
-	
+
 	parser.add_option("-g", "--mismatch_group",
 					  metavar="<VALUE>",
 					  type=int,
@@ -202,8 +201,8 @@ def optionParse():
 					  action="store",
 					  dest="g",
 					  help="Number of allowed mismatches in group.")
-					  
-	
+
+
 
 	(options, args) = parser.parse_args()
 
@@ -549,7 +548,7 @@ def getAllReads(fasta_file, log, parts=True):
 	if fasta_file:
 		reads = []
 		ext = fasta_file.rsplit(".", 1)[1]
-		if ext == "fasta":
+		if ext == "fasta" or ext == "fa":
 			with open(fasta_file, "r") as f:
 				reads = parseFasta(fasta_file, f, log, parts)
 		elif ext == "fastq":
@@ -571,12 +570,12 @@ def getAllReads(fasta_file, log, parts=True):
 					f = tar.extractfile(file)
 					reads += parseFastq(fasta_file, f, log, parts)
 		else:
-			print "File format", "*"+ext+"*", "is NOT supported. Use FASTA", 
+			print "File format", "*"+ext+"*", "is NOT supported. Use FASTA",
 			print "or FASTQ, possibly compressed as tar.gz."
 			sys.exit()
-		
+
 		return reads
-	
+
 	else:
 		return []
 
@@ -626,7 +625,7 @@ def parseFasta(filename, fasta_f, log, parts=True):
 	reads = []
 	seqs = 0
 	for line in fasta_f:
-		# If line starts with ">", which indicates end of a sequence, 
+		# If line starts with ">", which indicates end of a sequence,
 		# append it to list of reads
 		if line.startswith(">"):
 			if read != "":
@@ -753,15 +752,15 @@ def doWork(tup, b=None, q=None):
 		#numPairs += len(candidatePairs[key])
 		#val = ','.join(map(str, candidatePairs[key]))
 		#r.sadd(key,candidatePairs[key])
-	
+
 	# lst = [i for i in xrange(1000)]
 	# for i in xrange(100):
 	# 	r.rpush(i, lst)
 	print "Num buckets", len(buckets)
-	
+
 	#exportCandidatePairs(candidatePairs, filename, None, num)
 	#multiSeqAlign(normal, diseased, b, bands, prefix, suffix, num)
-	
+
 	#return buckets
 	#sys.exit()
 	return None
@@ -784,11 +783,10 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 		tim = time.clock()
 		random.seed(seed)
 		candidatePairs = dict()
-		#candDisk = shelve.open("testDictDisk")
-		
-		getAllReads(normal, log)
-		sys.exit()
-		
+
+		# getAllReads(normal, log)
+		# sys.exit()
+
 		if minhash_alg == 7:
 			p = getPrime(4**k)
 			shingles = None
@@ -816,20 +814,13 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 				minhashing(normal, diseased, shingles, buckets, k, rows,
 						   minhash_alg, b, bands, p, log)
 				logprint(log, False, "Number of buckets", len(buckets))
-				lshBand(buckets, b, candidatePairs, seqs, log)
-			
+				lshBand(buckets, b, candidatePairs, log)
+
 				# Stop if memory limit reached
 				# limit = memory_usage_resource()
 				# if int(limit) > 300000:
 				# 	break
 
-				# for idx in candidatePairs:
-				#	  try:
-				#		  data = candDisk[idx]
-				#	  except KeyError:
-				#		  pass
-				#	  candidatePairs[idx].add(data)
-				#	  candDisk[idx] = candidatePairs[idx]
 		if multiProcessing:
 			if pool:
 				numProcs = 3
@@ -856,12 +847,12 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 								candidatePairs[key] = set(tempDict[key])
 					# for buckets in results:
 					# 	numPairs = lshBandRedis(buckets, b, seqs, None, None)
-					logprint(log, False, 
+					logprint(log, False,
 							 "Finished combining candidate pairs in",
 						 	 (time.clock() - tim) / 60, "minutes")
-					logprint(log, True, "Memory usage (in mb):", 
+					logprint(log, True, "Memory usage (in mb):",
 							 memory_usage_resource())
-					
+
 					start += numProcs
 					if start > bands:
 						start = bands
@@ -870,16 +861,16 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 			else:
 				q = Queue()
 				#seqs = getAllReads(normal, log) + getAllReads(diseased, log)
-				params = (normal, diseased, shingles, k, rows, 
+				params = (normal, diseased, shingles, k, rows,
 						   minhash_alg, bands, p)
-			
+
 				numProcs = 25
 				start = numProcs if numProcs <= bands else bands
 				prev_start = 0
 				stop = bands
 				count = 0
 				while True: #start < stop+1:
-				
+
 					#processes = []
 					for b in xrange(prev_start, start):
 						p = Process(target=doWork, args=(params, b, q, ))
@@ -887,7 +878,7 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 						#processes.append(p)
 					prev_start = start
 					# pipe = r.pipeline()
-			
+
 					tim = time.clock()
 					logprint(log, False, "Combining candidate pairs...")
 					#d = shelve.open("shelveDBs/cache0")
@@ -912,13 +903,13 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 							# 	d[key] = temp_set
 							# else:
 							# 	d[key] = set(mates)
-				
+
 					start += numProcs
 					if start > bands:
 						start = bands
 					# for key in candidatePairs:
 					# 	print key, candidatePairs[key]
-			
+
 					# shelvesList = [shelve.open("shelveDBs/cache"+str(b), "r") for b
 					# 	 		   in xrange(1,bands)]
 					# for i in d.keys():
@@ -931,21 +922,21 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 					# 		for item in lst_temp:
 					# 			finalSet.add(item)
 					# 	d[str(i)] = list(finalSet)
-			
-			
+
+
 					#d.close()
-					logprint(log, False, 
+					logprint(log, False,
 							 "Finished combining candidate pairs in",
 							 (time.clock() - tim) / 60, "minutes")
-					logprint(log, True, "Memory usage (in mb):", 
+					logprint(log, True, "Memory usage (in mb):",
 							 memory_usage_resource())
-				
+
 					# q.close()
 					# for p in processes:
 					# 	p.join()
 					if prev_start == bands:
 						break
-			
+
 
 		logprint(log, False, "\nNumber of unique candidate pairs",
 				 sum(len(candidatePairs[i]) for i in candidatePairs)/2)
@@ -974,7 +965,7 @@ def getDocShingles(dna, k, asSet=True):
 		shingles = {dna[i:i+k] for i in xrange(len(dna)-k+1)}
 	else: # as list
 		shingles = [toBase10(dna[i:i+k]) for i in xrange(len(dna)-k+1)]
-	
+
 	# if not asSet:
 	# 	index = []
 	# 	for shingle in shingles:
@@ -989,7 +980,7 @@ def toBase10(seq):
 	#digits = []
 	n = 0
 	for s in seq:
-		if s == "A": 
+		if s == "A":
 			i = 0
 		elif s == "C":
 			i = 1
@@ -1136,7 +1127,7 @@ def lshBand(buckets, b, candidatePairs, log):
 						# 	candidatePairs[id2].append(id1)
 						# else:
 						# 	candidatePairs[id2] = [id1]
-						
+
 				elif id1 % 2 == 1 and id2 % 2 == 0:
 					if id1 - 1 != id2:
 						# naive = globalAlignment(seqs[id1], seqs[id2], o)
@@ -1151,7 +1142,7 @@ def lshBand(buckets, b, candidatePairs, log):
 						# 		candidatePairs[id2] = set([id1])
 						# 	numPairsUnique += 1
 						# total += 1
-						
+
 						if id1 in candidatePairs:
 							candidatePairs[id1].add(id2)
 						else:
@@ -1161,7 +1152,7 @@ def lshBand(buckets, b, candidatePairs, log):
 						else:
 							candidatePairs[id2] = set([id1])
 						numPairsUnique += 1
-						
+
 						# if id1 in candidatePairs:
 						# 	candidatePairs[id1].append(id2)
 						# else:
@@ -1170,7 +1161,7 @@ def lshBand(buckets, b, candidatePairs, log):
 						# 	candidatePairs[id2].append(id1)
 						# else:
 						# 	candidatePairs[id2] = [id1]
-						
+
 
 	logprint(log, True, "Number of buckets in band", str(b)+":", len(buckets))
 	logprint(log, False, "Skipped buckets:", skippedBuckets)
@@ -1184,7 +1175,7 @@ def lshBand(buckets, b, candidatePairs, log):
 			 str(b)+":", numPairsUnique)
 	logprint(log, False, "Total number of candidate pairs:", total)
 	# logprint(log, True, "Ratio:", float(numPairsUnique) / total)
-	
+
 	# temp
 	#logprint(log, False, "Number of buckets:", len(buckets))
 	#logprint(log, False, "Max bucket size:", maxBucket)
@@ -1208,7 +1199,7 @@ def lshBandRedis(buckets, b, seqs, log, r=None):
 	total = 0
 	o = 33  # overlap
 	skippedBuckets = 0
-	
+
 	# SET VERSION
 	if setVersion:
 		pipe = r.pipeline()
@@ -1258,7 +1249,7 @@ def lshBandRedis(buckets, b, seqs, log, r=None):
 		print "Dropping last"
 		r.put((-1, -1))
 		print "last dropped"
-	
+
 	else:
 		candidatePairs = dict()
 		for bucket in buckets:
@@ -1298,7 +1289,7 @@ def lshBandRedis(buckets, b, seqs, log, r=None):
 								numPairsUnique += 1
 							total += 1
 		#return candidatePairs
-		
+
 		#pipe = r.pipeline()
 		# for bucket in buckets:
 		# 	leftParts = []
@@ -1323,14 +1314,14 @@ def lshBandRedis(buckets, b, seqs, log, r=None):
 
 	# for key in d.keys():
 	# 	print key, d[key]
-	
+
 	logprint(log, False, "Skipped buckets:", skippedBuckets)
 	logprint(log, False, "Number of buckets in band", str(b)+":",len(buckets))
 	logprint(log, False, "Number of unique candidate pairs in band",
 			 str(b)+":", numPairsUnique)
 	logprint(log, False, "Total number of candidate pairs:", total)
 	logprint(log, True, "Ratio:", float(numPairsUnique) / total)
-	
+
 	#d.close()
 
 	# print "Finished LSH for band", b, "in", (time.clock() - tim) / 60, \
@@ -2284,18 +2275,6 @@ def print_alignedGroups(groups, read_R, seqs, log):
 			logprint(log, True, "Number of left parts:", len(leftParts))
 
 
-def getMates(read, r):
-	if setVersion:
-		for mate in r.smembers(read):
-			return int(mate)
-	else:
-		mates = r[str(read)]
-		if len(mates) > maxCandMates:
-		 	return []
-		else:
-			return mates
-
-
 def sequenceAlignment(candidatePairs, normal, diseased, log):
 	seqsNormal = getAllReads(normal, log)
 	global secondSample
@@ -2397,7 +2376,7 @@ def multiSeqAlign(seqs, p, pool_size, num, candidatePairs, log):
 		#print read_R
 
 		alignedGroups = []
-		
+
 		# Align left parts
 		#alignLeftParts(read_R, seqs, alignedGroups, None, log, r)
 		alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log)
@@ -2413,7 +2392,7 @@ def multiSeqAlign(seqs, p, pool_size, num, candidatePairs, log):
 		else:
 			numMutations2 += newFindMutation(read_R, seqs,
 											 alignedGroups, log)
-		
+
 
 		#print_alignedGroups(alignedGroups, read_R, seqs, log)
 		# sys.exit()
@@ -2461,7 +2440,7 @@ def initMultiSeqAlign(normal, diseased, candPairs, pool, pool_size, log=None):
 	seqsDiseased = getAllReads(diseased, log)
 	seqs = seqsNormal + seqsDiseased
 	num = len(seqs)
-	
+
 	#params = [(seqs, p, pool_size, num, log) for p in range(0, pool_size)]
 	#params = (seqs, pool_size, num, log)
 	#results = pool.map(multiSeqAlign, params)
@@ -2476,11 +2455,7 @@ def initMultiSeqAlign(normal, diseased, candPairs, pool, pool_size, log=None):
 def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log, r=None):
 	readROffset = len(seqs[read_R-1])
 	checkedLeftParts = set()
-	if r:
-		parts = getMates(read_R, r)
-		#parts = r[str(read_R)]
-	else:
-		parts = candidatePairs[read_R]
+	parts = candidatePairs[read_R]
 	for read_L in parts:
 		if read_L in checkedLeftParts:
 			continue
@@ -2554,7 +2529,7 @@ def alignLeftParts(read_R, seqs, alignedGroups, candidatePairs, log, r=None):
 
 				# Append new group to the other groups
 				alignedGroups.append(group)
-			
+
 			checkedLeftParts.add(read_L)
 	# TESTING - Second pass of left-parts
 	# for i in xrange(len(alignedGroups)):
@@ -2773,167 +2748,6 @@ def fitsInGroup(group, seqs, read_R, read_L, alignInfo, offset, m2):
 		# print
 
 	#group.mismatches = mismatches
-	return True
-
-
-def fitsInGroup4(groupOrg, group, seqs, read_R, next_read_R, offset, mis, m2):
-	global c4
-	c4 += 1
-	# print_fullConsensus(group.preConsensus, group.consensus)
-	seq_next_read_R = seqs[next_read_R-1]+seqs[next_read_R]
-	seq_read_R = seqs[read_R-1]+seqs[read_R]
-
-	# Computes the length of the pre-consensus extension, if any
-	lenPreConsensus = len(group.preConsensus)
-	toExtend = -(lenPreConsensus + (groupOrg.readROffset -
-				len(seqs[next_read_R-1]) + offset))
-
-	# Computes real offset of next_read_R in consensus - only changes if reads
-	# have varying lengths
-	# offset += group.readROffset - len(seqs[next_read_R-1])
-
-	if toExtend > 0:
-		"""
-		Case 1 - extending pre-consensus:
-		 GAG TTATCATTGTGACTGGACAAAGTACG
-		GGAG TTATCATTGTGACTGGACAAA
-		"""
-		beginning = lenPreConsensus
-		j = 0
-		l = 0
-	elif offset > 0:
-		"""
-		Case 2 - no pre consensus access:
-		GAG TTATCATTGTGACTGGACAAAGTACG
-			   TCATTGTGACTGGACAAA
-		"""
-		beginning = 0
-		j = offset
-		toExtend = 0
-	else:  # offset <= 0
-		"""
-		Case 3 - touching pre-consensus:
-		GAG TTATCATTGTGACTGGACAAAGTACG
-		 AG TTATCATTGTGACTGGACAAA
-		"""
-		# preconsensus already checked, start offset in read_k
-		beginning = -offset
-		# if read_k aligns in middle of consensus
-		j = 0
-		# Offset in preConsensus
-		l = lenPreConsensus+offset
-		# No extension
-		toExtend = 0
-
-	if old:
-
-		mismatches = 0
-
-		# Check if next_read_R matches main-consensus
-		start = beginning + toExtend
-		for i in xrange(len(seq_next_read_R)-start):
-			if len(group.consensus[i+j]) > 1 or group.\
-				   consensus[i+j].keys()[0] != seq_next_read_R[i+start]:
-				mismatches += 1
-				if mismatches > m2:
-					return False
-
-		# Check positions in pre-consensus before next_read_R for mismatches
-		for i in xrange(lenPreConsensus-beginning):
-			if len(group.consensus[i]) > 1:
-				mismatches += 1
-				if mismatches > m2:
-					return False
-
-		# Check positions in consensus before next_read_R for mismatches
-		for i in xrange(offset):
-			if len(group.consensus[i]) > 1:
-				mismatches += 1
-				if mismatches > m2:
-					return False
-
-		# Check if next_read_R matches pre-consensus
-		for i in xrange(beginning):
-			if len(group.preConsensus[i+l]) > 1 or group.\
-				   preConsensus[i+l].keys()[0] != seq_next_read_R[i+toExtend]:
-				mismatches += 1
-				if mismatches > m2:
-					global c3
-					c3 += 1
-					return False
-	else:
-		localMismatches = set([mismatch for mismatch in mis])
-		mismatches = mis
-		for mismatch in groupOrg.mismatches:
-			mismatches.add(mismatch)
-		for mismatch in group.mismatches:
-			mismatches.add(mismatch)
-
-
-		# print "hej"
-		# print mismatches
-
-		# if offset < 0:
-		#	  print " "*(-offset), print_fullConsensus([],group.consensus)
-		# else:
-		#	  print_fullConsensus([],group.consensus)
-		# print " "*offset, seq_next_read_R
-
-		start = beginning + toExtend
-		for i in xrange(groupOrg.leftReadsOffset):
-			if len(group.consensus[i+j]) > 1 or group.\
-				   consensus[i+j].keys()[0] != seq_next_read_R[i+start]:
-				mismatches.add(i+j)
-				if seq_read_R[i+j] != seq_next_read_R[i+start]:
-					localMismatches.add(i+j)
-				# if len(mismatches) > m2:
-				#	  return False
-
-		# Check if next_read_R matches pre-consensus
-		for i in xrange(beginning):
-			# print group.preConsensus
-			if len(group.preConsensus[i+l]) > 1 or group.\
-				   preConsensus[i+l].keys()[0] != seq_next_read_R[i+toExtend]:
-				mismatches.add(beginning-(i+l))
-				if seq_read_R[i+l] != seq_next_read_R[i+toExtend]:
-					localMismatches.add(beginning-(i+l))
-				# if len(mismatches) > m2:
-				#	  return False
-
-		if len(mismatches) > m2 and len(localMismatches) <= m2:
-			createNewGroup(groupOrg, next_read_R, seq_next_read_R, offset, localMismatches)
-			return False
-		elif len(mismatches) > m2:
-			return False
-
-		#print mismatches
-		group.mismatches = mismatches
-
-
-	# Update pre-consensus
-	for i in xrange(beginning):
-		bp = seq_next_read_R[i+toExtend]
-		group.preConsensus[i+l][bp] = group.preConsensus[i+l].get(bp, 0) + 1
-
-	# Update main-consensus
-	for i in xrange(len(seq_next_read_R)-start):
-		bp = seq_next_read_R[i+start]
-		group.consensus[i+j][bp] = group.consensus[i+j].get(bp, 0) + 1
-
-	# Extend pre-consensus if required
-	if toExtend > 0:
-		prePart = [{seq_next_read_R[i]:1} for i in xrange(toExtend)]
-		group.preConsensus = prePart + group.preConsensus
-
-	# Add read to group
-	global c2
-	c2 += 1
-	if next_read_R in group.rightParts:
-		group.rightParts[next_read_R].add(offset)
-	else:
-		group.rightParts[next_read_R] = set([offset])
-
-	#groupOrg.mismatches += mismatches
 	return True
 
 
@@ -3253,7 +3067,7 @@ def testRead(group, seqs, read_R, next_read_R, offset, m2, alignments, log):
 	return alignments + 1
 
 
-def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log, r=None):
+def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
 	startOnePosOverlap = True
 	for group in alignedGroups:
 		group.checkedRightParts.add(read_R)
@@ -3264,12 +3078,9 @@ def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log, r=None):
 		# 	c8 += 1
 		# 	continue
 		for read_L in (group.leftPartsN.keys()+group.leftPartsD.keys()):
-			if r:
-				parts = getMates(read_L, r)
-			else:
-				if len(candidatePairs[read_L]) > maxCandMates:
-					continue
-				parts = candidatePairs[read_L]
+			if len(candidatePairs[read_L]) > maxCandMates:
+				continue
+			parts = candidatePairs[read_L]
 			for next_read_R in parts:
 				if next_read_R not in group.checkedRightParts:
 					if startOnePosOverlap:
@@ -3409,27 +3220,13 @@ def oldFindMutation(read_R, seqs, alignedGroups, log):
 					for mut2 in muts2:
 						if mut1 != mut2 and not isUsefulGroup:
 							read = seqs[read_R]
-							print_compare(read, mis, mut1, 
+							print_compare(read, mis, mut1,
 										  rightPartGroup.consensus, log)
 							isUsefulGroup = True
 							numUsefulGroups += 1
 							print_alignedGroup(group, rightPartGroup, read_R,
 													seqs, log)
 
-			# OLD STUFF
-			# if len(rightPartGroup.mismatches) > 0:
-				# mutation1 = findMutation(read_R, seqs,
-				#		  group.leftPartsN, rightPartGroup.rightPartsN,
-				#		  rightPartGroup.mismatches, True, log)
-				# if mutation1 == "Fail":
-				#	  continue
-				# mutation2 = findMutation(read_R, seqs,
-				#		  group.leftPartsD, rightPartGroup.rightPartsD,
-				#		  rightPartGroup.mismatches, False, log)
-				# if mutation2 != "Fail" and mutation1 != mutation2:
-				#	  numUsefulGroups += 1
-				#	  print_alignedGroup(group, rightPartGroup, read_R,
-				#						  seqs, log)
 	return numUsefulGroups
 
 
@@ -3489,137 +3286,13 @@ def findMutation(read_R, seqs, leftparts, rightparts, mutationsPos, first, log):
 			#firstSampleBP.add(read[mutationsPos-offset])
 			bp = read[mutationsPos-offset]
 			mutationBPsRight[bp] = mutationBPsRight.get(bp, 0) + 1
-	#if len(firstSampleBP) == 1 and count >= requiredOverlaps:
-		# logprint(log, False, "group mismatches:", firstSampleBP)
-		#return list(firstSampleBP)[0]
-	# else:
-	#	  return "Fail"
 	for bp in mutationBPsRight:
 		overlapsLeft = mutationBPsLeft.get(bp, 0)
-		#print "HEJ", mutationBPsRight[bp]+overlapsLeft
 		if overlapsLeft > 0:
 			if mutationBPsRight[bp]+overlapsLeft >= requiredOverlaps:
 				validBPs.append(bp)
 	return validBPs
 
-
-# ************************************************************************** #
-#																			 #
-#				 Constructing groups for variations discovery				 #
-#																			 #
-# ************************************************************************** #
-def findMutations(candidatePairs, normal, diseased, log):
-	seqsNormal = getAllReads(normal, log, parts=False)
-	global secondSample
-	secondSample = len(seqsNormal)
-	seqsDiseased = getAllReads(diseased, log, parts=False)
-	seqs = seqsNormal + seqsDiseased
-
-	numUsefulGroups = 0
-	numParts = len(candidatePairs) / 2 / 2 + 1 # Bad estimate
-	prog = 0
-	tim = time.clock()
-	for read_R in candidatePairs:
-		if read_R < secondSample and read_R % 2 == 1:
-		# if read_R == 42535:
-		# if read_R == 19:
-			alignedGroups = []
-
-			# Align left parts
-			alignNormal(read_R, seqs, alignedGroups, candidatePairs, log)
-
-			# Align right parts
-			# alignDiseased(read_R, seqs, alignedGroups, candidatePairs, log)
-
-			# Analyze the aligned group to find mutations
-			# print_alignedGroups(alignedGroups, read_R, seqs, log)
-			for group in alignedGroups:
-				for rightPartGroup in group.rightPartGroups:
-					if len(rightPartGroup.mismatches) > 0:
-						mutation1 = findMutation(read_R, seqs,
-								group.leftPartsN, rightPartGroup.rightPartsN,
-								rightPartGroup.mismatches, True, log)
-						if mutation1 == "Fail":
-							continue
-						mutation2 = findMutation(read_R, seqs,
-								group.leftPartsD, rightPartGroup.rightPartsD,
-								rightPartGroup.mismatches, False, log)
-						if mutation2 != "Fail" and mutation1 != mutation2:
-							numUsefulGroups += 1
-							print_alignedGroup(group, rightPartGroup, read_R,
-												seqs, log)
-
-			# print_alignedGroups(alignedGroups, read_R, seqs, log)
-			# sys.exit()
-
-			prog += 1
-			if prog % 500 == 0:
-				logprint(log, False, "Processed", prog, "of", numParts,
-						 "anchor points in", (time.clock()-tim)/60, "minutes")
-				logprint(log, True, "Memory usage (in mb):",
-						 memory_usage_resource())
-				global c1
-				logprint(log, False, "left parts aligned:", c1)
-				#c1 = 0
-				global c2
-				logprint(log, True, "right parts aligned:", c2)
-				logprint(log, True, "num useful groups:", numUsefulGroups)
-				#c2 = 0
-				#sys.exit()
-				#gc.collect()
-
-	logprint(log, False, "Finished sequence alignment",
-			 (time.clock() - tim) / 60, "minutes")
-	logprint(log, True, "Memory usage (in mb):", memory_usage_resource())
-	logprint(log, False, "c1:", c1)
-	logprint(log, False, "c2:", c2)
-	logprint(log, False, "c3:", c3)
-	logprint(log, False, "c4:", c4)
-	logprint(log, False, "c5:", c5)
-	logprint(log, False, "c6:", c6)
-	logprint(log, False, "c7:", c7)
-	logprint(log, False, "numReadL:", numreadL)
-	logprint(log, False, "numReadR:", numreadR)
-	logprint(log, False, "numUsefulGroups:", numUsefulGroups)
-
-
-def alignNormal(read_R, seqs, alignedGroups, candidatePairs, log):
-	seq_read_R = seqs[(read_R-1)/2]
-	s = len(seq_read_R)-len(seq_read_R[int(len(seq_read_R)*rightPartRatio):])
-	k = 10
-	for read_L in candidatePairs[read_R]:
-		seq_read_L = seqs[read_L/2]
-		print seq_read_R
-		print seq_read_L
-		print k
-		print s
-		# Step 1: Align completely to anchor with zero mismatches
-		for alignment in naive_alignment(seq_read_R, seq_read_L, s, k, 0, 2):
-			print alignment
-		sys.exit()
-
-
-def naive_alignment(a, b, s, kn, m, n):
-	"""
-	a: read_R
-	b: read_L
-	kn: shifts to check
-	s: offset (start) in one string
-	m: is allowed mismatches
-	n: number of alignments to return
-	"""
-	mismatches = []
-	for k in xrange(kn):
-		for i in xrange(len(a)-s-k):
-			if a[i+k+s] != b[i]:
-				mismatches.append(i+k+s)
-				if len(mismatches) == m:
-					break
-		if len(mismatches) <= m:
-			yield k+s
-			n -= 1
-			if n == 0:
-				break
 
 # ************************************************************************** #
 #																			 #
@@ -3780,26 +3453,18 @@ def main():
 			#						  minhash_alg, log)
 			multiProcessing = False
 			if multiProcessing:
-				# r = redis.StrictRedis()
-				# r.flushdb()
 				p_size = bands
 				# pool = Pool(processes=p_size)
 				pool = None
 				candidatePairs = runLSH(normal_file, diseased_file, bands,
 					 				rows, k, seed, minhash_alg, test, log,
 									multiProcessing, pool)
-				# for i in xrange(20):
-				# 	print i, r.lrange(i,0,-1)
-				# 	for mates in r.lrange(i,0,-1):
-				# 		for mate in eval(mates):
-				# 			print mate
-				
-			
+
 			else:
-				candidatePairs = runLSH(normal_file, diseased_file, bands, 
+				candidatePairs = runLSH(normal_file, diseased_file, bands,
 									rows, k, seed, minhash_alg, test, log,
 									multiProcessing, None)
-			
+
 		if output_file:
 			output = "candidate_pairs_k_"+str(k)+"_b_"+str(bands)+"_r_"+ \
 					 str(rows)+"_m_"+str(minhash_alg)
@@ -3859,8 +3524,7 @@ def main():
 			initMultiSeqAlign(normal_file, diseased_file, candidatePairs,
 				 			  pool, p_size, log)
 		else:
-			# If no test to run on LSH, continue with contructing
-			#findMutations(candidatePairs, normal_file, diseased_file, log)
+			# If no test to run on LSH, continue with constructing groups of aligned reads
 			sequenceAlignment(candidatePairs, normal_file, diseased_file, log)
 
 		logprint(log, True, "Total time used:", (time.clock() - totim) / 60,
