@@ -31,7 +31,7 @@ setVersion = False
 
 # Sequence Alignment
 M1 = 1
-M2 = 2
+M2 = 3
 secondSample = 0
 overlap = 8 # Overlap region in both directions i.e. 20 overlap in total if 10
 maxAlignments = 1 # per read
@@ -3525,6 +3525,9 @@ def main():
 				 			  pool, p_size, log)
 		else:
 			# If no test to run on LSH, continue with constructing groups of aligned reads
+            #findMutations(candidatePairs, normal_file, diseased_file, log)
+			a = 2
+			print("hej")
 			sequenceAlignment(candidatePairs, normal_file, diseased_file, log)
 
 		logprint(log, True, "Total time used:", (time.clock() - totim) / 60,
