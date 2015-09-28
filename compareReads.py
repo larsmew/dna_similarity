@@ -794,8 +794,8 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 			shingles = dict()
 			shingles = computeShinglesTable(normal, shingles, k, log)
 			shingles = computeShinglesTable(diseased, shingles, k, log)
-			# p = getPrime(len(shingles))
-			p = 0
+			p = getPrime(len(shingles))
+			# p = 0
 		# Computes set of all k-shingles
 		else:  # minhash alg 1, 2, 4 or 5
 			# shingles = computeShinglesSet(fasta_file, k, log)
@@ -803,8 +803,8 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 			shingles = computeShinglesSet(normal, shingles, k, log)
 			shingles = computeShinglesSet(diseased, shingles, k, log)
 			shingles = list(shingles)
-			#p = getPrime(len(shingles))
-			p = 0
+			p = getPrime(len(shingles))
+			# p = 0
 		# Use Locality-Sensitive Hashing to compute for each bands the buckets
 		# with similar documents (reads) obtained by minhashing each read.
 		if not multiProcessing:
@@ -998,7 +998,7 @@ def minhashing(normal, diseased, kmers, buckets, k, rows, minhash_alg, bn, bs, p
 			n = 4**k
 		else:
 			n = len(kmers)
-		p = getPrime(n) # temp
+		# p = getPrime(n) # temp
 		a = [random.randrange(1, n) for i in xrange(rows)]
 		b = [random.randrange(n) for i in xrange(rows)]
 	for part in getPartsFromFile(normal, log):
