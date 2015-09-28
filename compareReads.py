@@ -12,12 +12,10 @@ from itertools import chain
 from multiprocessing import Pool, Queue, Process
 import sys, time, os
 import random
-import gc
 import copy
 import json, csv
 import cPickle as pickle
 import shelve
-import math
 import resource
 import ntpath
 import tarfile
@@ -1921,7 +1919,6 @@ def euclideanDistance(doc1, doc2):
 	#	  print sig1
 	#	  print sig2
 	#	  print lol
-	#	  print math.sqrt(lol)
 	# else:
 	#	  sys.exit(0)
 
@@ -2111,6 +2108,7 @@ def print_fullConsensus(preconsensus, consensus, log=None):
 				log.write(" "+consensusString+"\n")
 		else:
 			continue
+
 
 def print_alignedGroup(group, rightPartGroup, read_R, seqs, log):
 	logprint(log, False, "\nread_R:", read_R)
@@ -3059,12 +3057,11 @@ def alignRightParts(read_R, seqs, alignedGroups, candidatePairs, log):
 	startOnePosOverlap = True
 	for group in alignedGroups:
 		group.checkedRightParts.add(read_R)
-		# if len(group.leftPartsN)+len(group.leftPartsD) < 3:
-		# 	# logprint(log, False, "\n\nTOO SMALL GROUP:")
-		# 	# print_leftGroup(group, read_R, seqs, log)
-		# 	global c8
-		# 	c8 += 1
-		# 	continue
+		# TODO: Should probably be removed as valid groups might be removed
+		if len(group.leftPartsN)+len(group.leftPartsD) < 3:
+			global c8
+			c8 += 1
+			continue
 		for read_L in (group.leftPartsN.keys()+group.leftPartsD.keys()):
 			if len(candidatePairs[read_L]) > maxCandMates:
 				continue
@@ -3331,6 +3328,7 @@ def seqAlignAllReads(fasta_file, log):
 	logprint(log, False, "numReadL:", numreadL)
 	logprint(log, False, "numReadR:", numreadR)
 
+
 def alignLeft(read_R, seqs, alignedGroups, log):
 	readROffset = len(seqs[read_R-1])
 	for read_L in xrange(0,len(seqs),2):
@@ -3387,6 +3385,7 @@ def alignLeft(read_R, seqs, alignedGroups, log):
 
 				# Append new group to the other groups
 				alignedGroups.append(group)
+
 
 def alignRight(read_R, seqs, alignedGroups, log):
 	for group in alignedGroups:
@@ -3514,8 +3513,6 @@ def main():
 		else:
 			# If no test to run on LSH, continue with constructing groups of aligned reads
             #findMutations(candidatePairs, normal_file, diseased_file, log)
-			a = 2
-			print("hej")
 			sequenceAlignment(candidatePairs, normal_file, diseased_file, log)
 
 		logprint(log, True, "Total time used:", (time.clock() - totim) / 60,
