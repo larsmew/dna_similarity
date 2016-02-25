@@ -31,9 +31,9 @@ setVersion = False
 M1 = 1
 M2 = 2
 secondSample = 0
-overlap = 8 # Overlap region in both directions i.e. 20 overlap in total if 10
+overlap = 6 # Overlap region in both directions i.e. 20 overlap in total if 10
 maxAlignments = 1 # per read
-requiredOverlaps = 4
+requiredOverlaps = 3
 maxCandMates = 5000
 MUTFIND = 1
 p_id = -1
@@ -50,8 +50,6 @@ c7 = 0
 c8 = 0
 numreadL = 0
 numreadR = 0
-
-old = False
 
 # ************************************************************************** #
 #																			 #
@@ -738,8 +736,7 @@ def doWork(tup, b=None, q=None):
 	#candidatePairs = dict()
 	num = minhashing(normal, diseased, shingles, buckets, k, rows,
 			   min_alg, b, bands, p, None)
-	numPairs = lshBandRedis(buckets, b, seqs, None, q)
-	# for key, parts in lshBandRedis(buckets, b, candidatePairs, None, r):
+	numPairs = lshBandMultiCore(buckets, b, seqs, None, q)
 
 	#numPairs = 0
 	#for key in candidatePairs:
@@ -794,8 +791,8 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 			shingles = dict()
 			shingles = computeShinglesTable(normal, shingles, k, log)
 			shingles = computeShinglesTable(diseased, shingles, k, log)
-			p = getPrime(len(shingles))
-			# p = 0
+			# p = getPrime(len(shingles))
+			p = 0
 		# Computes set of all k-shingles
 		else:  # minhash alg 1, 2, 4 or 5
 			# shingles = computeShinglesSet(fasta_file, k, log)
@@ -803,8 +800,8 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 			shingles = computeShinglesSet(normal, shingles, k, log)
 			shingles = computeShinglesSet(diseased, shingles, k, log)
 			shingles = list(shingles)
-			p = getPrime(len(shingles))
-			# p = 0
+			#p = getPrime(len(shingles))
+			p = 0
 		# Use Locality-Sensitive Hashing to compute for each bands the buckets
 		# with similar documents (reads) obtained by minhashing each read.
 		if not multiProcessing:
@@ -845,8 +842,6 @@ def runLSH(normal, diseased, bands, rows, k, seed, minhash_alg, test, log, multi
 									candidatePairs[key].add(item)
 							else:
 								candidatePairs[key] = set(tempDict[key])
-					# for buckets in results:
-					# 	numPairs = lshBandRedis(buckets, b, seqs, None, None)
 					logprint(log, False,
 							 "Finished combining candidate pairs in",
 						 	 (time.clock() - tim) / 60, "minutes")
@@ -998,7 +993,7 @@ def minhashing(normal, diseased, kmers, buckets, k, rows, minhash_alg, bn, bs, p
 			n = 4**k
 		else:
 			n = len(kmers)
-		# p = getPrime(n) # temp
+		p = getPrime(n) # temp
 		a = [random.randrange(1, n) for i in xrange(rows)]
 		b = [random.randrange(n) for i in xrange(rows)]
 	for part in getPartsFromFile(normal, log):
@@ -1175,7 +1170,7 @@ def lshBand(buckets, b, candidatePairs, log):
 	return None
 
 
-def lshBandRedis(buckets, b, seqs, log, r=None):
+def lshBandMultiCore(buckets, b, seqs, log, r=None):
 	tim = time.clock()
 	logprint(log, True, "Running LSH and finding similar pairs...")
 	numPairsUnique = 0
@@ -2551,7 +2546,6 @@ def findAlignment(r_R, r_L, seqs, readROffset, m, log):
 	else:
 		lengthToCompare = len(read_R)# - overlap*2
 	overlapLength = lengthToCompare - overlap*2
-	lengthToCompare2 = lengthToCompare
 	# check for alignment by shifting read_L along read_R
 	while lengthToCompare > overlapLength:
 		mismatches = set()
@@ -2577,41 +2571,6 @@ def findAlignment(r_R, r_L, seqs, readROffset, m, log):
 				break
 		offset += 1
 		lengthToCompare -= 1
-	#yield -1
-
-	# check for alignment by shifting read_R along read_L
-	# offset = 0
-	# read_L_rest = seqs[r_L+1]
-	# while lengthToCompare2 > overlapLength:
-	#	  mismatches = set()
-	#	  for i in xrange(lengthToCompare2):
-	#		  if read_R[i] != read_L[i+offset]:
-	#			  global c3
-	#			  c3 += 1
-	#			  mismatches.add(i+offset+readROffset)
-	#			  if len(mismatches) > m:
-	#				  break
-	#	  # Check overshiftet part of read_R against last part of read_L
-	#	  if len(mismatches) <= m:
-	#		  restToCompare = len(read_R)-len(read_L)+offset
-	#		  start = len(read_R) - restToCompare
-	#		  for i in xrange(restToCompare):
-	#			  if read_R[i+start] != read_L_rest[i]:
-	#				  mismatches.add(i+offset+readROffset)
-	#				  if len(mismatches) > m:
-	#					  break
-	#	  if len(mismatches) <= m:
-	#		  if doPrint:
-	#			  print "offset:", offset
-	#			  print " "*(offset), read_R
-	#			  print " "*(-offset), read_L+" "+read_L_rest
-	#			  print mismatches
-	#		  yield -offset, mismatches, lengthToCompare2+2*offset
-	#		  alignments += 1
-	#		  if maxAlignments == alignments:
-	#			  break
-	#	  offset += 1
-	#	  lengthToCompare2 -= 1
 
 
 def fitsInGroup(group, seqs, read_R, read_L, alignInfo, offset, m2):
@@ -2630,81 +2589,49 @@ def fitsInGroup(group, seqs, read_R, read_L, alignInfo, offset, m2):
 				mis.add(i+offset+group.readROffset)
 	offset += group.readROffset
 
-	# yo = False
+	mismatches = set()
+	seq_read_R = seqs[read_R-1]+seqs[read_R]
+	# lenToCompare = min(len(group.consensus)-offset, len(lread_L))
+	# for i in xrange(lenToCompare):
+	#	  if len(group.consensus[i+offset]) > 1 or \
+	#		 group.consensus[i+offset].keys()[0] != lread_L[i]:
+	#		  mismatches.add(i+offset)
+
+	lenToCompare = len(group.consensus)-len(seq_read_R)
+	readLLength = len(lread_L) - lenCompared
 	# if offset < 50:
-	#	  yo = True
+	#	  print
+	#	  print_fullConsensus([], group.consensus)
+	#	  print lenToCompare
+	#	  print readLLength
+	#	  print lenCompared
+	if readLLength < lenToCompare:
+		extraStart = lenToCompare - readLLength
+		lenToCompare = readLLength
+		# print extraStart
+		# print_fullConsensus([], group.consensus)
+		# print " "*offset, lread_L
+
+	for i in xrange(lenToCompare):
+		if len(group.consensus[i+len(seq_read_R)]) > 1 or \
+				group.consensus[i+len(seq_read_R)].keys()[0] != \
+				lread_L[i+lenCompared]:
+			mismatches.add(i+len(seq_read_R))
+
+	for m in group.mismatches:
+		mismatches.add(m)
+	for m in mis:
+		mismatches.add(m)
+
+	# if offset < 50:
 	#	  print " "*offset, (seqs[read_L]+seqs[read_L+1])
 	#	  print " "*-offset, seqs[read_R-1]+seqs[read_R]
 	#	  print offset
 
-	if old:
-		# Check consensus for mismatches before alignment of read_L
-		# for i in xrange(offset-group.readROffset):
-		#	  if len(group.consensus[i+group.readROffset]) > 1:
-		#		  mismatches += 1
-		#		  if mismatches > m2:
-		#			  return False
-
-		lenToCompare = min(len(group.consensus)-offset, len(lread_L))
-		for i in xrange(lenToCompare):
-			if len(group.consensus[i+offset]) > 1 or \
-			   group.consensus[i+offset].keys()[0] != lread_L[i]:
-				mismatches += 1
-				if mismatches > m2:
-					return False
-
-		# Check consensus for mismatches after alignment of read_L
-		# for i in xrange(len(group.consensus) - lenToCompare - offset):
-		#	  if len(group.consensus[i + lenToCompare + offset]) > 1:
-		#		  mismatches += 1
-		#		  if mismatches > m2:
-		#			  return False
+	if len(mismatches) <= m2:
+		group.mismatches = mismatches
 	else:
-		mismatches = set()
-		seq_read_R = seqs[read_R-1]+seqs[read_R]
-		# lenToCompare = min(len(group.consensus)-offset, len(lread_L))
-		# for i in xrange(lenToCompare):
-		#	  if len(group.consensus[i+offset]) > 1 or \
-		#		 group.consensus[i+offset].keys()[0] != lread_L[i]:
-		#		  mismatches.add(i+offset)
-
-		lenToCompare = len(group.consensus)-len(seq_read_R)
-		readLLength = len(lread_L) - lenCompared
-		# if offset < 50:
-		#	  print
-		#	  print_fullConsensus([], group.consensus)
-		#	  print lenToCompare
-		#	  print readLLength
-		#	  print lenCompared
-		if readLLength < lenToCompare:
-			extraStart = lenToCompare - readLLength
-			lenToCompare = readLLength
-			# print extraStart
-			# print_fullConsensus([], group.consensus)
-			# print " "*offset, lread_L
-
-		for i in xrange(lenToCompare):
-			if len(group.consensus[i+len(seq_read_R)]) > 1 or \
-					group.consensus[i+len(seq_read_R)].keys()[0] != \
-					lread_L[i+lenCompared]:
-				mismatches.add(i+len(seq_read_R))
-
-		for m in group.mismatches:
-			mismatches.add(m)
-		for m in mis:
-			mismatches.add(m)
-
-		# if offset < 50:
-		#	  print " "*offset, (seqs[read_L]+seqs[read_L+1])
-		#	  print " "*-offset, seqs[read_R-1]+seqs[read_R]
-		#	  print offset
-
-		if len(mismatches) <= m2:
-			group.mismatches = mismatches
-		else:
-			# if yo:
-			#	  sys.exit()
-			return False
+		return False
 
 	# Update consensus
 	lenToUpdate = min(len(group.consensus)-offset, len(lread_L))
