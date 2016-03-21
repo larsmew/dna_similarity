@@ -31,9 +31,9 @@ setVersion = False
 M1 = 1
 M2 = 2
 secondSample = 0
-overlap = 6 # Overlap region in both directions i.e. 20 overlap in total if 10
+overlap = 8 # Overlap region in both directions i.e. 20 overlap in total if 10
 maxAlignments = 1 # per read
-requiredOverlaps = 3
+requiredOverlaps = 4
 maxCandMates = 5000
 MUTFIND = 1
 p_id = -1
@@ -683,27 +683,26 @@ def getPartsFromFile(fasta_file, log):
 				yield rightpart
 
 
-def isPrime(n):
-	"""
-	Checks if the given number (n) is a prime number.
-	"""
-	if n == 2 or n == 3: return True
-	if n < 2 or n % 2 == 0: return False
-	if n < 9: return True
-	if n % 3 == 0: return False
-	r = int(n**0.5)
-	f = 5
-	while f <= r:
-		if n % f == 0: return False
-		if n % (f+2) == 0: return False
-		f += 6
-	return True
-
-
 def getPrime(offset):
 	"""
 	Finds the first prime number higher than a given offset.
 	"""
+	def isPrime(n):
+		"""
+		Checks if the given number (n) is a prime number.
+		"""
+		if n == 2 or n == 3: return True
+		if n < 2 or n % 2 == 0: return False
+		if n < 9: return True
+		if n % 3 == 0: return False
+		r = int(n**0.5)
+		f = 5
+		while f <= r:
+			if n % f == 0: return False
+			if n % (f+2) == 0: return False
+			f += 6
+		return True
+
 	start = random.randrange(100)
 	# print "start", start
 	offset += start
